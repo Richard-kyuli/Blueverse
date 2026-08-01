@@ -1,0 +1,2 @@
+# Blueverse
+Academic writing website.
