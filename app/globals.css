@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: theme("colors.brandIce");
+  color: theme("colors.textBody");
+  font-family: theme("fontFamily.sans");
+}
+
+@layer utilities {
+  /* Subtle blueprint grid background pattern */
+  .bg-grid {
+    background-image: linear-gradient(
+        to right,
+        theme("colors.brandGrid") 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, theme("colors.brandGrid") 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+}
+
