@@ -1,5 +1,7 @@
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { Toaster } from "react-hot-toast";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -17,15 +19,19 @@ const playfair = Playfair_Display({
 });
 
 export const metadata = {
-  title: "BlueVerse Co. — Research, Strategy & Clear Writing",
-  description:
-    "Bridging complex research, strategy, and clear writing for academics, decision-makers, and digital creators.",
+  title: "BlueVerse - Academic Writing Marketplace",
+  description: "Connect with expert writers for your academic assignments",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <AuthProvider>
+          {children}
+          <Toaster position="top-right" />
+        </AuthProvider>
+      </body>
     </html>
   );
 }

@@ -73,18 +73,18 @@ function Navbar() {
 
         {/* Nav actions */}
         <div className="flex items-center gap-3">
-          <a
-            href="#"
+          <Link
+            href="/auth/signin"
             className="hidden text-sm font-medium text-textBody transition-colors duration-200 hover:text-brandBlue sm:inline-block"
           >
             Log In
-          </a>
-          <a
-            href="#contact"
+          </Link>
+          <Link
+            href="/auth/signup"
             className="rounded-md bg-brandBlue px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-brandAccent"
           >
-            Create Free Account
-          </a>
+            Get Started
+          </Link>
         </div>
       </nav>
     </header>
@@ -120,25 +120,23 @@ function Hero() {
 
           {/* Sub-headline */}
           <p className="mx-auto mt-6 max-w-3xl text-xl text-textBody md:text-2xl">
-            I help academics, decision-makers, and digital creators turn complex
-            ideas into structured, high-impact written content—delivered
-            clearly, accurately, and on time.
+            A marketplace connecting students with expert academic writers. Post your assignment and get quality work delivered on time.
           </p>
 
           {/* CTAs */}
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <a
-              href="#contact"
+            <Link
+              href="/auth/signup"
               className="rounded-md bg-brandBlue px-8 py-4 text-lg font-medium text-white shadow-lg transition-all duration-200 hover:bg-brandAccent hover:shadow-xl"
             >
-              Book a Discovery Call
-            </a>
-            <a
-              href="#work"
+              Get Started Free
+            </Link>
+            <Link
+              href="#services"
               className="rounded-md border-2 border-brandGrid bg-white px-8 py-4 text-lg font-medium text-textDark transition-all duration-200 hover:border-brandNavy hover:bg-brandIce"
             >
-              View My Work ↓
-            </a>
+              Learn More ↓
+            </Link>
           </div>
 
           {/* Trust bar */}
@@ -426,12 +424,12 @@ function FinalCTA() {
 
         {/* Primary button */}
         <div className="mt-10">
-          <a
-            href="mailto:essaymaster1970@gmail.com"
+          <Link
+            href="/auth/signup"
             className="inline-block rounded-md bg-white px-8 py-4 text-lg font-bold text-brandBlue transition-all duration-200 hover:bg-gray-100"
           >
-            Schedule a Free Consultation
-          </a>
+            Join BlueVerse Today
+          </Link>
         </div>
 
         {/* Contact information */}
