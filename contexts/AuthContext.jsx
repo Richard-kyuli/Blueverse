@@ -23,37 +23,45 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Check active session
     const getSession = async () => {
-      console.log('Checking session...');
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      console.log('Session result:', session);
-      
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await fetchProfile(session.user.id);
+      try {
+        console.log('Checking session...');
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        console.log('Session result:', session);
+        
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        }
+      } catch (error) {
+        console.error('Error getting session:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
 
     getSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session);
-      
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
-    });
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed:', event, session);
+        
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
+      });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    } catch (error) {
+      console.error('Error setting up auth listener:', error);
+    }
   }, []);
 
   const fetchProfile = async (userId) => {
