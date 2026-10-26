@@ -4,30 +4,43 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { ClipboardList } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import { bidStatusIcon } from '@/lib/status';
 
 export default function BidsPage() {
   const { profile } = useAuth();
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
+
+  const userId = profile?.id;
 
   useEffect(() => {
     fetchBids();
-  }, [profile]);
+  }, [userId]);
 
   const fetchBids = async () => {
+    // The profile arrives asynchronously; there is nothing to query until then.
+    if (!userId) return;
+
+    setLoading(true);
+
     try {
-      const { data, error} = await supabase
+      setError(null);
+
+      const { data, error: queryError } = await supabase
         .from('bids')
         .select('*, assignments(*)')
-        .eq('writer_id', profile.id)
+        .eq('writer_id', userId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (queryError) throw queryError;
       setBids(data || []);
-    } catch (error) {
-      console.error('Error fetching bids:', error);
+    } catch (loadError) {
+      console.error('Error fetching bids:', loadError);
+      setError(loadError.message || 'Failed to load your bids');
     } finally {
       setLoading(false);
     }
@@ -51,13 +64,8 @@ export default function BidsPage() {
   };
 
   const getStatusIcon = (status) => {
-    const icons = {
-      pending: '⏳',
-      accepted: '✅',
-      rejected: '❌',
-      withdrawn: '🚫',
-    };
-    return icons[status] || '📋';
+    const Icon = bidStatusIcon(status);
+    return <Icon className="h-6 w-6 text-brandBlue" aria-hidden="true" />;
   };
 
   if (loading) {
@@ -76,6 +84,20 @@ export default function BidsPage() {
           <h1 className="text-3xl font-bold text-brandNavy">My Bids</h1>
           <p className="mt-2 text-textBody">Track all your submitted bids</p>
         </div>
+
+        {error && (
+          <div role="alert" className="mb-6 rounded-lg border border-red-200 bg-red-50 p-5">
+            <p className="font-medium text-red-800">Could not load your bids</p>
+            <p className="mt-1 text-sm text-red-600">{error}</p>
+            <button
+              type="button"
+              onClick={fetchBids}
+              className="mt-3 rounded-lg bg-brandBlue px-4 py-2 text-sm font-medium text-white hover:bg-brandAccent transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
@@ -131,7 +153,9 @@ export default function BidsPage() {
         {/* Bids List */}
         {filteredBids.length === 0 ? (
           <div className="bg-white rounded-xl border border-brandGrid p-12 text-center">
-            <div className="text-6xl mb-4">📋</div>
+            <div className="h-20 w-20 bg-brandIce rounded-full flex items-center justify-center mx-auto mb-4">
+              <ClipboardList className="h-10 w-10 text-brandBlue" aria-hidden="true" />
+            </div>
             <h3 className="text-xl font-bold text-brandNavy mb-2">
               {bids.length === 0 ? 'No bids yet' : `No ${filter} bids`}
             </h3>
@@ -165,7 +189,7 @@ export default function BidsPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="text-2xl">{getStatusIcon(bid.status)}</span>
+                      {getStatusIcon(bid.status)}
                       <h3 className="text-xl font-bold text-brandNavy">
                         {bid.assignments?.title || 'Assignment'}
                       </h3>
@@ -224,10 +248,30 @@ export default function BidsPage() {
                       Edit Bid
                     </Link>
                   )}
+                  {bid.status === 'accepted' &&
+                    (['assigned', 'in_progress'].includes(bid.assignments?.status) ? (
+                      <Link
+                        href={`/dashboard/assignments/${bid.assignment_id}/submit`}
+                        className="flex-1 text-center bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                      >
+                        Submit Work
+                      </Link>
+                    ) : bid.assignments?.status === 'under_review' ? (
+                      <div className="flex-1 text-center bg-amber-100 text-amber-800 py-2 rounded-lg font-medium">
+                        Under Review
+                      </div>
+                    ) : (
+                      <div className="flex-1 text-center bg-green-100 text-green-800 py-2 rounded-lg font-medium">
+                        {bid.assignments?.status === 'completed' ? 'Completed' : 'Accepted'}
+                      </div>
+                    ))}
                   {bid.status === 'accepted' && (
-                    <div className="flex-1 text-center bg-green-500 text-white py-2 rounded-lg font-medium">
-                      ✅ Accepted - Awaiting Payment
-                    </div>
+                    <Link
+                      href={`/dashboard/assignments/${bid.assignment_id}/messages`}
+                      className="flex-1 text-center border-2 border-brandGrid text-brandBlue py-2 rounded-lg font-medium hover:border-brandBlue hover:bg-brandIce transition-colors"
+                    >
+                      Messages
+                    </Link>
                   )}
                 </div>
               </div>

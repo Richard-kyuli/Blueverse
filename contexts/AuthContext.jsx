@@ -24,12 +24,8 @@ export const AuthProvider = ({ children }) => {
     // Check active session
     const getSession = async () => {
       try {
-        console.log('Checking session...');
-        
         const { data: { session } } = await supabase.auth.getSession();
-        
-        console.log('Session result:', session);
-        
+
         setUser(session?.user ?? null);
         
         if (session?.user) {
@@ -47,8 +43,6 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log('Auth state changed:', event, session);
-        
         setUser(session?.user ?? null);
         
         if (session?.user) {
@@ -66,15 +60,11 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (userId) => {
     try {
-      console.log('Fetching profile for user:', userId);
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
-
-      console.log('Profile fetch result:', { data, error });
 
       if (error) {
         console.error('Profile fetch error:', error);
@@ -82,7 +72,6 @@ export const AuthProvider = ({ children }) => {
       }
       
       setProfile(data);
-      console.log('Profile set successfully:', data);
     } catch (error) {
       console.error('Error fetching profile:', error);
     }

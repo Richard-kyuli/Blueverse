@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import SubmissionForm from './SubmissionForm';
+import { supabase } from '@/lib/supabase';
 
 // Mock next/navigation
 vi.mock('next/navigation', () => ({
@@ -35,6 +36,15 @@ vi.mock('@/components/shared/FileUploader', () => ({
   ),
 }));
 
+// Mock Supabase client - the form only uses auth.getSession()
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn(),
+    },
+  },
+}));
+
 describe('SubmissionForm', () => {
   const mockAssignment = {
     id: 'test-assignment-id',
@@ -54,6 +64,12 @@ describe('SubmissionForm', () => {
     vi.clearAllMocks();
     global.fetch = vi.fn();
     global.confirm = vi.fn(() => true);
+
+    // Valid session by default so submissions can be attempted
+    supabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'test-access-token' } },
+      error: null,
+    });
   });
 
   it('renders the assignment details header', () => {

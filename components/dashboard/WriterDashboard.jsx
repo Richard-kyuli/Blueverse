@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { Briefcase, Zap, CheckCircle, DollarSign, Search, TrendingUp, Star, Award } from 'lucide-react';
+import { Briefcase, Zap, CheckCircle, DollarSign, Search, TrendingUp, Star, Award, ArrowRight } from 'lucide-react';
+import { buildEarningsSummary } from '@/lib/payments';
+import { ACTIVE_ASSIGNMENT_STATUSES } from '@/lib/status';
 
 export default function WriterDashboard() {
   const { profile } = useAuth();
@@ -16,59 +18,65 @@ export default function WriterDashboard() {
   });
   const [recentOpportunities, setRecentOpportunities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const userId = profile?.id;
 
   useEffect(() => {
+    if (!userId) return;
     fetchDashboardData();
-  }, [profile]);
+  }, [userId]);
 
   const fetchDashboardData = async () => {
+    if (!userId) return;
+
     try {
-      // Fetch writer's bids
-      const { data: bids } = await supabase
+      setError(null);
+
+      // Bids the writer has placed
+      const { data: bids, error: bidsError } = await supabase
         .from('bids')
-        .select('*')
-        .eq('writer_id', profile.id);
+        .select('id, status')
+        .eq('writer_id', userId);
 
-      // Fetch writer's active jobs
-      const { data: activeJobs } = await supabase
+      if (bidsError) throw bidsError;
+
+      // Every job that has been awarded to this writer
+      const { data: jobs, error: jobsError } = await supabase
         .from('assignments')
         .select('*')
-        .eq('assigned_writer_id', profile.id)
-        .in('status', ['assigned', 'in_progress']);
+        .eq('assigned_writer_id', userId)
+        .in('status', [...ACTIVE_ASSIGNMENT_STATUSES, 'under_review', 'completed']);
 
-      // Fetch completed jobs
-      const { data: completedJobs } = await supabase
+      if (jobsError) throw jobsError;
+
+      // Recent open assignments, excluding anything this writer posted
+      const { data: opportunities, error: opportunitiesError } = await supabase
         .from('assignments')
         .select('*')
-        .eq('assigned_writer_id', profile.id)
-        .eq('status', 'completed');
-
-      // Fetch recent open assignments (opportunities)
-      const { data: opportunities } = await supabase
-        .from('assignments')
-        .select(`
-          *,
-          profiles:student_id (
-            full_name
-          )
-        `)
         .eq('status', 'open')
+        .neq('student_id', userId)
         .order('created_at', { ascending: false })
         .limit(5);
 
+      if (opportunitiesError) throw opportunitiesError;
+
       setRecentOpportunities(opportunities || []);
 
-      // Calculate earnings
-      const earnings = completedJobs?.reduce((sum, job) => sum + parseFloat(job.final_price || 0), 0) || 0;
+      const rows = jobs || [];
+      const activeJobs = rows.filter((job) => ACTIVE_ASSIGNMENT_STATUSES.includes(job.status));
+      const completedJobs = rows.filter((job) => job.status === 'completed');
 
       setStats({
-        activeBids: bids?.filter(b => b.status === 'pending').length || 0,
-        activeJobs: activeJobs?.length || 0,
-        completedJobs: completedJobs?.length || 0,
-        totalEarnings: earnings * 0.85, // 85% after platform fee
+        activeBids: (bids || []).filter((bid) => bid.status === 'pending').length,
+        activeJobs: activeJobs.length,
+        completedJobs: completedJobs.length,
+        // Same arithmetic as the earnings page, after the platform fee.
+        totalEarnings: buildEarningsSummary(completedJobs).totals.totalEarned,
       });
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+    } catch (loadError) {
+      console.error('Error fetching dashboard data:', loadError);
+      setError(loadError.message || 'Failed to load your dashboard');
     } finally {
       setLoading(false);
     }
@@ -84,10 +92,24 @@ export default function WriterDashboard() {
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-10">
         <div>
           <p className="text-sm font-medium text-textMuted">Dashboard</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-text-primary md:text-4xl">Welcome back, {profile.full_name}!</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-brandNavy md:text-4xl">Welcome back, {profile.full_name}!</h1>
           <p className="mt-2 text-textBody">Here are your writing opportunities</p>
         </div>
       </header>
+
+      {error && (
+        <div role="alert" className="mb-8 rounded-lg border border-red-200 bg-red-50 p-5">
+          <p className="font-medium text-red-800">Could not load your dashboard</p>
+          <p className="mt-1 text-sm text-red-600">{error}</p>
+          <button
+            type="button"
+            onClick={fetchDashboardData}
+            className="mt-3 rounded-lg bg-brandBlue px-4 py-2 text-sm font-medium text-white hover:bg-brandAccent transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <section aria-label="Overview" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -150,14 +172,14 @@ export default function WriterDashboard() {
                 <p className="text-blue-100 text-sm mb-2">Rating</p>
                 <div className="flex items-center gap-2">
                   <Star className="h-6 w-6 fill-yellow-300 text-yellow-300" />
-                  <p className="text-2xl font-bold">{profile.rating || '0.00'}</p>
+                  <p className="text-2xl font-bold">{Number(profile.rating ?? 0).toFixed(2)}</p>
                 </div>
               </div>
               <div>
                 <p className="text-blue-100 text-sm mb-2">Success Rate</p>
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-6 w-6" />
-                  <p className="text-2xl font-bold">{profile.success_rate || '0'}%</p>
+                  <p className="text-2xl font-bold">{Number(profile.success_rate ?? 0).toFixed(0)}%</p>
                 </div>
               </div>
               <div>
@@ -220,7 +242,8 @@ export default function WriterDashboard() {
           </div>
           {recentOpportunities.length > 0 && (
             <Link href="/dashboard/browse" className="text-brandBlue hover:text-brandAccent font-medium text-sm flex items-center gap-1">
-              Browse All →
+              Browse All
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           )}
         </div>

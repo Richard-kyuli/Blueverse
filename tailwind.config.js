@@ -1,5 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // The design system is light-only: brand navy/blue on white. Tailwind defaults to
+  // darkMode 'media', which silently darkens any element carrying a `dark:` variant
+  // whenever the OS is in dark mode. Pinning it to 'class' means dark variants only
+  // apply if a `dark` class is added deliberately, so OS settings cannot override
+  // the brand palette.
+  darkMode: 'class',
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",

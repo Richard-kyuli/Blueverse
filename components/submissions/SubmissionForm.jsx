@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { AlertCircle, FileText, Loader2, CheckCircle2 } from 'lucide-react';
 import FileUploader from '@/components/shared/FileUploader';
+import { supabase } from '@/lib/supabase';
 
 /**
  * SubmissionForm Component
@@ -73,6 +74,14 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
       return;
     }
 
+    // The API authenticates the caller with their Supabase access token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.access_token) {
+      toast.error('Your session has expired. Please sign in again.');
+      return;
+    }
+
     setUploading(true);
     
     // Initialize progress for each file
@@ -115,6 +124,9 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
       // Call the submission API endpoint
       const response = await fetch('/api/submissions/submit', {
         method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: formData,
       });
 
@@ -184,16 +196,16 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+    <div className="space-y-6">
       {/* Assignment Details Header (Read-only) */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
-        <div className="flex items-start justify-between mb-4">
+      <div className="bg-white rounded-xl border border-brandGrid p-6 sm:p-8">
+        <div className="flex items-start justify-between gap-4 mb-6">
           <div className="flex-1">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-brandNavy mb-2">
               {assignment.title}
             </h2>
             <span
-              className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(
+              className={`inline-block px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusBadge(
                 assignment.status
               )}`}
             >
@@ -202,20 +214,20 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-brandGrid">
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Subject</p>
-            <p className="font-medium text-gray-900 dark:text-gray-100">{assignment.subject}</p>
+            <p className="text-sm text-textMuted mb-1">Subject</p>
+            <p className="font-medium text-textDark">{assignment.subject}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Deadline</p>
-            <p className="font-medium text-gray-900 dark:text-gray-100">
+            <p className="text-sm text-textMuted mb-1">Deadline</p>
+            <p className="font-medium text-textDark">
               {new Date(assignment.deadline).toLocaleString()}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Payment</p>
-            <p className="font-medium text-blue-600 dark:text-blue-400">
+            <p className="text-sm text-textMuted mb-1">Payment</p>
+            <p className="font-medium text-brandBlue">
               ${assignment.final_price || assignment.budget_max}
             </p>
           </div>
@@ -225,15 +237,15 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
       {/* Submission Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* File Upload Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+        <div className="bg-white rounded-xl border border-brandGrid p-6 sm:p-8">
           <div className="flex items-center gap-2 mb-4">
-            <FileText className="text-blue-600 dark:text-blue-400" size={24} />
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            <FileText className="text-brandBlue" size={24} aria-hidden="true" />
+            <h3 className="text-lg font-bold text-brandNavy">
               Upload Your Completed Work
             </h3>
           </div>
           
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-sm text-textBody mb-4">
             Upload your completed assignment files. You can select multiple files (up to 10 files, 50MB each).
           </p>
 
@@ -245,22 +257,22 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
           {/* Upload Progress Bars */}
           {uploading && Object.keys(uploadProgress).length > 0 && (
             <div className="mt-6 space-y-3">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <h4 className="text-sm font-medium text-brandNavy">
                 Uploading files...
               </h4>
               {Object.entries(uploadProgress).map(([fileName, progress]) => (
                 <div key={fileName} className="space-y-1">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400 truncate max-w-xs">
+                    <span className="text-textBody truncate max-w-xs">
                       {fileName}
                     </span>
-                    <span className="text-gray-600 dark:text-gray-400 font-medium">
+                    <span className="text-textBody font-medium">
                       {Math.round(progress)}%
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div className="w-full bg-brandGrid rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-brandBlue h-2 rounded-full transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -271,12 +283,12 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
         </div>
 
         {/* Submission Notes Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="bg-white rounded-xl border border-brandGrid p-6 sm:p-8">
+          <h3 className="text-lg font-bold text-brandNavy mb-4">
             Submission Notes (Optional)
           </h3>
           
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-sm text-textBody mb-4">
             Add any notes, comments, or instructions for the student about your submission.
           </p>
 
@@ -286,21 +298,21 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
             disabled={uploading}
             placeholder="Example: I've completed the essay according to your requirements. The main document is in PDF format, and I've included my research sources in a separate ZIP file."
             rows={6}
-            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg 
-                     bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                     placeholder:text-gray-400 dark:placeholder:text-gray-500
-                     focus:ring-2 focus:ring-blue-500 focus:border-transparent
+            className="w-full px-4 py-3 border border-brandGrid rounded-lg
+                     bg-white text-textDark
+                     placeholder:text-textMuted
+                     focus:ring-2 focus:ring-brandBlue focus:border-transparent
                      disabled:opacity-50 disabled:cursor-not-allowed
                      resize-none"
           />
         </div>
 
         {/* Info Banner */}
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex gap-3">
-          <AlertCircle className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" size={20} />
-          <div className="text-sm text-blue-800 dark:text-blue-300">
-            <p className="font-medium mb-1">Important:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-700 dark:text-blue-400">
+        <div className="bg-brandIce border border-brandGrid rounded-lg p-4 flex gap-3">
+          <AlertCircle className="text-brandBlue flex-shrink-0 mt-0.5" size={20} aria-hidden="true" />
+          <div className="text-sm">
+            <p className="font-medium text-brandNavy mb-1">Important:</p>
+            <ul className="list-disc list-inside space-y-1 text-textBody">
               <li>Once submitted, you cannot edit this submission until the student reviews it</li>
               <li>The student will be notified immediately of your submission</li>
               <li>Make sure all files are correct before submitting</li>
@@ -313,10 +325,10 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
           <button
             type="submit"
             disabled={files.length === 0 || uploading}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 
-                     bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg
+            className="flex-1 flex items-center justify-center gap-2 px-6 py-3
+                     bg-brandBlue hover:bg-brandAccent text-white font-medium rounded-lg
                      disabled:opacity-50 disabled:cursor-not-allowed
-                     transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                     transition-colors focus:outline-none focus:ring-2 focus:ring-brandBlue focus:ring-offset-2"
           >
             {uploading ? (
               <>
@@ -335,11 +347,11 @@ export default function SubmissionForm({ assignment, writerId, onSuccess, onCanc
             type="button"
             onClick={handleCancel}
             disabled={uploading}
-            className="sm:flex-initial px-6 py-3 border-2 border-gray-300 dark:border-gray-600 
-                     text-gray-700 dark:text-gray-300 font-medium rounded-lg
-                     hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700
+            className="sm:flex-initial px-6 py-3 border-2 border-brandGrid
+                     text-textDark font-medium rounded-lg
+                     hover:border-brandBlue hover:text-brandBlue
                      disabled:opacity-50 disabled:cursor-not-allowed
-                     transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                     transition-colors focus:outline-none focus:ring-2 focus:ring-brandBlue focus:ring-offset-2"
           >
             Cancel
           </button>

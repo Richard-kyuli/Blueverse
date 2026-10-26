@@ -203,29 +203,29 @@ export default function FileUploader({
         className={`
           relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
           transition-all duration-200 ease-in-out
-          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+          focus:outline-none focus:ring-2 focus:ring-brandBlue focus:ring-offset-2
           ${isDragging 
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-102' 
-            : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+            ? 'border-brandBlue bg-brandIce scale-102' 
+            : 'border-brandGrid hover:border-brandBlue hover:bg-brandIce'
           }
         `}
       >
         <Upload 
           className={`mx-auto mb-4 transition-colors ${
-            isDragging ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500'
+            isDragging ? 'text-brandBlue' : 'text-textMuted'
           }`}
           size={48}
           aria-hidden="true"
         />
         
         <div className="space-y-2">
-          <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
+          <p className="text-lg font-medium text-brandNavy">
             {isDragging ? 'Drop files here' : 'Drag and drop files here'}
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-textBody">
             or click to browse from your computer
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+          <p className="text-xs text-textMuted mt-2">
             Accepted: PDF, DOC, DOCX, TXT, ZIP • Max {formatFileSize(maxFileSize)} per file • Up to {maxFiles} files
           </p>
         </div>
@@ -245,16 +245,16 @@ export default function FileUploader({
       {/* Error Messages */}
       {errors.length > 0 && (
         <div 
-          className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+          className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg"
           role="alert"
           aria-live="polite"
         >
-          <p className="text-sm font-medium text-red-800 dark:text-red-300 mb-2">
+          <p className="text-sm font-medium text-red-800 mb-2">
             {errors.length === 1 ? 'Upload Error:' : 'Upload Errors:'}
           </p>
           <ul className="list-disc list-inside space-y-1">
             {errors.map((error, index) => (
-              <li key={index} className="text-sm text-red-700 dark:text-red-400">
+              <li key={index} className="text-sm text-red-700">
                 {error}
               </li>
             ))}
@@ -265,7 +265,7 @@ export default function FileUploader({
       {/* Selected Files List */}
       {selectedFiles.length > 0 && (
         <div className="mt-6">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+          <h3 className="text-sm font-medium text-brandNavy mb-3">
             Selected Files ({selectedFiles.length}/{maxFiles})
           </h3>
           <ul className="space-y-2" role="list" aria-label="Selected files">
@@ -275,19 +275,19 @@ export default function FileUploader({
               return (
                 <li
                   key={`${file.name}-${index}`}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                  className="flex items-center justify-between p-3 bg-brandIce rounded-lg border border-brandGrid hover:border-brandBlue transition-colors"
                 >
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <IconComponent 
-                      className="text-blue-500 dark:text-blue-400 flex-shrink-0" 
+                      className="text-brandBlue flex-shrink-0" 
                       size={20}
                       aria-hidden="true"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                      <p className="text-sm font-medium text-textDark truncate">
                         {file.name}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-textMuted">
                         {formatFileSize(file.size)}
                       </p>
                     </div>
@@ -302,7 +302,7 @@ export default function FileUploader({
                       e.stopPropagation();
                       handleRemoveKeyDown(e, index);
                     }}
-                    className="ml-3 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    className="ml-3 p-1.5 text-textMuted hover:text-red-500 hover:bg-red-50 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                     aria-label={`Remove ${file.name}`}
                     type="button"
                   >

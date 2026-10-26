@@ -4,65 +4,58 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { FileText } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import { statusIcon, statusLabel, statusTone } from '@/lib/status';
+
+/** statusIcon() returns a lucide component, so it needs its own render helper. */
+function AssignmentStatusIcon({ status }) {
+  const Icon = statusIcon(status);
+  return <Icon className="h-6 w-6 text-brandBlue" aria-hidden="true" />;
+}
 
 export default function AssignmentsPage() {
   const { profile } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
+
+  const userId = profile?.id;
 
   useEffect(() => {
     fetchAssignments();
-  }, [profile, filter]);
+  }, [userId, filter]);
 
   const fetchAssignments = async () => {
+    // The profile arrives asynchronously; there is nothing to query until then.
+    if (!userId) return;
+
+    setLoading(true);
+
     try {
+      setError(null);
+
       let query = supabase
         .from('assignments')
         .select('*, bids(count)')
-        .eq('student_id', profile.id)
+        .eq('student_id', userId)
         .order('created_at', { ascending: false });
 
       if (filter !== 'all') {
         query = query.eq('status', filter);
       }
 
-      const { data, error } = await query;
+      const { data, error: queryError } = await query;
 
-      if (error) throw error;
+      if (queryError) throw queryError;
       setAssignments(data || []);
-    } catch (error) {
-      console.error('Error fetching assignments:', error);
+    } catch (loadError) {
+      console.error('Error fetching assignments:', loadError);
+      setError(loadError.message || 'Failed to load your assignments');
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      open: 'bg-blue-100 text-blue-800',
-      assigned: 'bg-yellow-100 text-yellow-800',
-      in_progress: 'bg-purple-100 text-purple-800',
-      under_review: 'bg-orange-100 text-orange-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-gray-100 text-gray-800',
-      disputed: 'bg-red-100 text-red-800',
-    };
-    return badges[status] || badges.open;
-  };
-
-  const getStatusIcon = (status) => {
-    const icons = {
-      open: '📢',
-      assigned: '👤',
-      in_progress: '✍️',
-      under_review: '👀',
-      completed: '✅',
-      cancelled: '❌',
-      disputed: '⚠️',
-    };
-    return icons[status] || '📝';
   };
 
   if (loading) {
@@ -89,6 +82,21 @@ export default function AssignmentsPage() {
             + Post New Assignment
           </Link>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-5">
+            <p className="font-medium text-red-800">Could not load your assignments</p>
+            <p className="mt-1 text-sm text-red-600">{error}</p>
+            <button
+              type="button"
+              onClick={fetchAssignments}
+              className="mt-3 rounded-lg bg-brandBlue px-4 py-2 text-sm font-medium text-white hover:bg-brandAccent transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex gap-3 overflow-x-auto pb-2">
@@ -117,7 +125,9 @@ export default function AssignmentsPage() {
         {/* Assignments List */}
         {assignments.length === 0 ? (
           <div className="bg-white rounded-xl border border-brandGrid p-12 text-center">
-            <div className="text-6xl mb-4">📝</div>
+            <div className="h-20 w-20 bg-brandIce rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText className="h-10 w-10 text-brandBlue" aria-hidden="true" />
+            </div>
             <h3 className="text-xl font-bold text-brandNavy mb-2">
               {filter === 'all' ? 'No assignments yet' : `No ${filter.replace('_', ' ')} assignments`}
             </h3>
@@ -146,17 +156,17 @@ export default function AssignmentsPage() {
                 <div className="flex justify-between items-start mb-5">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
-                      <span className="text-2xl">{getStatusIcon(assignment.status)}</span>
+                      <AssignmentStatusIcon status={assignment.status} />
                       <h3 className="text-xl font-bold text-brandNavy">{assignment.title}</h3>
                     </div>
                     <p className="text-textBody line-clamp-2">{assignment.description}</p>
                   </div>
                   <span
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ml-4 ${getStatusBadge(
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ml-4 ${statusTone(
                       assignment.status
                     )}`}
                   >
-                    {assignment.status.replace('_', ' ')}
+                    {statusLabel(assignment.status)}
                   </span>
                 </div>
 

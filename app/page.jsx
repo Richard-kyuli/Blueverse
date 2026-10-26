@@ -12,6 +12,7 @@
 // ============================================================================
 
 import Link from "next/link";
+import { ArrowDown, ArrowRight, Check, Mail, Phone } from "lucide-react";
 
 // ----------------------------------------------------------------------------
 // Logo
@@ -135,7 +136,8 @@ function Hero() {
               href="#services"
               className="rounded-md border-2 border-brandGrid bg-white px-8 py-4 text-lg font-medium text-textDark transition-all duration-200 hover:border-brandNavy hover:bg-brandIce"
             >
-              Learn More ↓
+              Learn More
+              <ArrowDown className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
 
@@ -144,9 +146,18 @@ function Hero() {
             className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-textMuted"
             aria-label="Trust guarantees"
           >
-            <span>✓ Specialized Research & Writing</span>
-            <span>✓ 100% Human-Crafted Quality</span>
-            <span>✓ Fast Turnarounds</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Check className="h-4 w-4 text-brandBlue" aria-hidden="true" />
+              Specialized Research & Writing
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Check className="h-4 w-4 text-brandBlue" aria-hidden="true" />
+              100% Human-Crafted Quality
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Check className="h-4 w-4 text-brandBlue" aria-hidden="true" />
+              Fast Turnarounds
+            </span>
           </div>
         </div>
       </div>
@@ -339,7 +350,7 @@ function FeaturedWork() {
         "Comprehensive internal and external analysis for international market entry.",
       result:
         "Delivered a structured 1,500-word strategic roadmap covering cultural adaptation and entry risk.",
-      linkText: "Read Brief Summary →",
+      linkText: "Read Brief Summary",
       href: "#work",
     },
     {
@@ -348,7 +359,7 @@ function FeaturedWork() {
         "Breakdown of complex theoretical frameworks into an engaging 5-part educational video series.",
       result:
         "Increased retention and simplified key principles for a broad digital audience.",
-      linkText: "Watch Preview →",
+      linkText: "Watch Preview",
       href: "#work",
     },
   ];
@@ -393,7 +404,10 @@ function FeaturedWork() {
                 href={study.href}
                 className="mt-auto pt-6 text-brandBlue transition-colors duration-200 hover:text-brandAccent"
               >
-                <span className="font-medium">{study.linkText}</span>
+                <span className="inline-flex items-center gap-2 font-medium">
+                  {study.linkText}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </span>
               </a>
             </article>
           ))}
@@ -438,12 +452,16 @@ function FinalCTA() {
             Or contact directly:
           </p>
           <div className="mt-4 flex flex-col items-center justify-center gap-2 text-lg">
-            <p>📞 +254 171 754 04</p>
+            <p className="inline-flex items-center gap-2">
+              <Phone className="h-4 w-4" aria-hidden="true" />
+              +254 171 754 04
+            </p>
             <a
               href="mailto:essaymaster1970@gmail.com"
-              className="transition-colors duration-200 hover:text-blue-200"
+              className="inline-flex items-center gap-2 transition-colors duration-200 hover:text-blue-200"
             >
-              ✉️ essaymaster1970@gmail.com
+              <Mail className="h-4 w-4" aria-hidden="true" />
+              essaymaster1970@gmail.com
             </a>
           </div>
           <p className="mt-3 text-sm text-blue-200">

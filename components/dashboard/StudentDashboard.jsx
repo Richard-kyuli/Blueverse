@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { FileText, Zap, CheckCircle, DollarSign, PlusCircle, MessageSquare, Eye } from 'lucide-react';
+import { FileText, Zap, CheckCircle, DollarSign, PlusCircle, MessageSquare, Eye, ArrowRight } from 'lucide-react';
+import { statusLabel, statusTone } from '@/lib/status';
 
 export default function StudentDashboard() {
   const { profile } = useAuth();
@@ -28,31 +29,32 @@ export default function StudentDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      console.log('Fetching dashboard data for student:', profile?.id);
-      
-      // Fetch assignments
-      const { data: assignments, error } = await supabase
+      setError(null);
+
+      // Fetch every assignment so the totals are accurate, then list only the
+      // five most recent ones.
+      const { data: assignments, error: queryError } = await supabase
         .from('assignments')
         .select('*')
         .eq('student_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .order('created_at', { ascending: false });
 
-      console.log('Student assignments query result:', { assignments, error });
-
-      if (error) {
-        console.error('Supabase error:', error);
-        setError(error.message);
-        throw error;
+      if (queryError) {
+        console.error('Supabase error:', queryError);
+        throw queryError;
       }
 
-      setRecentAssignments(assignments || []);
+      const all = assignments || [];
+      setRecentAssignments(all.slice(0, 5));
 
       // Calculate stats
-      const total = assignments?.length || 0;
-      const active = assignments?.filter(a => ['open', 'assigned', 'in_progress'].includes(a.status)).length || 0;
-      const completed = assignments?.filter(a => a.status === 'completed').length || 0;
-      const spent = assignments?.filter(a => a.final_price).reduce((sum, a) => sum + parseFloat(a.final_price), 0) || 0;
+      const total = all.length;
+      const active = all.filter(a => ['open', 'assigned', 'in_progress'].includes(a.status)).length;
+      const completed = all.filter(a => a.status === 'completed').length;
+      // Only money already released to a writer counts as spent.
+      const spent = all
+        .filter(a => a.status === 'completed' && a.final_price)
+        .reduce((sum, a) => sum + parseFloat(a.final_price), 0);
 
       setStats({
         totalAssignments: total,
@@ -60,27 +62,12 @@ export default function StudentDashboard() {
         completedAssignments: completed,
         totalSpent: spent,
       });
-
-      console.log('Dashboard stats:', { total, active, completed, spent });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setError(error.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      open: 'bg-blue-100 text-blue-800',
-      assigned: 'bg-yellow-100 text-yellow-800',
-      in_progress: 'bg-purple-100 text-purple-800',
-      under_review: 'bg-orange-100 text-orange-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-gray-100 text-gray-800',
-      disputed: 'bg-red-100 text-red-800',
-    };
-    return badges[status] || badges.open;
   };
 
   if (loading) {
@@ -233,7 +220,7 @@ export default function StudentDashboard() {
               aria-label="View all assignments"
             >
               View All
-              <span aria-hidden="true">→</span>
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           )}
         </div>
@@ -282,8 +269,8 @@ export default function StudentDashboard() {
                         </time>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(assignment.status)}`}>
-                          {assignment.status.replace('_', ' ')}
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${statusTone(assignment.status)}`}>
+                          {statusLabel(assignment.status)}
                         </span>
                       </td>
                       <td className="px-4 py-4">

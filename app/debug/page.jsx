@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ArrowRight, Bug, ClipboardList, LogOut, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -52,7 +53,10 @@ export default function DebugPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">🐛 Debug Page</h1>
+        <h1 className="mb-8 flex items-center gap-2 text-3xl font-bold">
+          <Bug className="h-7 w-7" aria-hidden="true" />
+          Debug Page
+        </h1>
 
         {/* Auth Context */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
@@ -76,31 +80,37 @@ export default function DebugPage() {
           <div className="space-y-2">
             <button
               onClick={runTests}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2"
+              className="mr-2 inline-flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
             >
-              🔄 Rerun Tests
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              Rerun Tests
             </button>
             <button
               onClick={() => window.location.href = '/dashboard'}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mr-2"
+              className="mr-2 inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
             >
-              → Go to Dashboard
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Go to Dashboard
             </button>
             <button
               onClick={async () => {
                 await supabase.auth.signOut();
                 window.location.href = '/auth/signin';
               }}
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+              className="inline-flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
             >
-              🚪 Sign Out
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Sign Out
             </button>
           </div>
         </div>
 
         {/* Instructions */}
         <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h3 className="font-bold mb-2">📋 What to Check:</h3>
+          <h3 className="mb-2 flex items-center gap-2 font-bold">
+            <ClipboardList className="h-4 w-4" aria-hidden="true" />
+            What to Check:
+          </h3>
           <ul className="list-disc list-inside space-y-1 text-sm">
             <li><strong>session:</strong> Should be "EXISTS"</li>
             <li><strong>userId:</strong> Should show a UUID</li>

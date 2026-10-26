@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Lock, Eye, EyeOff } from 'lucide-react';
+import { Lock, Eye, EyeOff, Check, X } from 'lucide-react';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -151,8 +151,13 @@ export default function ResetPasswordPage() {
 
           {/* Password Match Indicator */}
           {password && confirmPassword && (
-            <div className={`text-sm ${password === confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
-              {password === confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+            <div className={`flex items-center gap-1.5 text-sm ${password === confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
+              {password === confirmPassword ? (
+                <Check className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <X className="h-4 w-4" aria-hidden="true" />
+              )}
+              {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
             </div>
           )}
 

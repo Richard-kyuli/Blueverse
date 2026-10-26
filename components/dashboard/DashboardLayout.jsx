@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import ProfileModal from './ProfileModal';
+import NotificationBell from './NotificationBell';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -24,9 +25,6 @@ export default function DashboardLayout({ children }) {
   const { profile, signOut, loading } = useAuth();
   const pathname = usePathname();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-
-  // Debug logging
-  console.log('DashboardLayout render:', { profile, loading, pathname });
 
   const studentNav = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -103,22 +101,26 @@ export default function DashboardLayout({ children }) {
             <span className="text-xl font-bold text-brandBlue">BlueVerse</span>
           </Link>
 
-          {/* User Info */}
-          <div className="flex items-center gap-3" aria-label="User information">
-            {profile?.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.full_name}
-                className="h-10 w-10 rounded-full object-cover border-2 border-brandGrid"
-              />
-            ) : (
-              <div className="h-10 w-10 rounded-full bg-brandBlue/10 flex items-center justify-center" aria-hidden="true">
-                <User className="h-5 w-5 text-brandBlue" />
+          {/* Notifications + User Info */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            <NotificationBell userId={profile.id} />
+
+            <div className="flex items-center gap-3" aria-label="User information">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.full_name}
+                  className="h-10 w-10 rounded-full object-cover border-2 border-brandGrid"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-brandBlue/10 flex items-center justify-center" aria-hidden="true">
+                  <User className="h-5 w-5 text-brandBlue" />
+                </div>
+              )}
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium text-textDark">{profile?.full_name}</p>
+                <p className="text-xs text-textMuted capitalize">{profile?.user_type}</p>
               </div>
-            )}
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-textDark">{profile?.full_name}</p>
-              <p className="text-xs text-textMuted capitalize">{profile?.user_type}</p>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { Search } from 'lucide-react';
+import { Check, RefreshCw, Search } from 'lucide-react';
 
 export default function BrowseAssignmentsPage() {
   const { profile } = useAuth();
@@ -19,17 +19,25 @@ export default function BrowseAssignmentsPage() {
     max_budget: '',
   });
 
+  const userId = profile?.id;
+
   useEffect(() => {
     fetchAssignments();
-  }, []);
+  }, [userId]);
 
   const fetchAssignments = async () => {
+    // The profile arrives asynchronously; DashboardLayout shows a spinner until
+    // then, so there is nothing to query yet.
+    if (!userId) return;
+
+    setLoading(true);
+
     try {
       setError(null);
-      console.log('Fetching assignments for writer:', profile?.id);
-      
-      // Fixed query: specify which relationship to use (student profile)
-      let query = supabase
+
+      // Only open work from other people: writers can post assignments too and
+      // should never be able to bid on their own job.
+      const { data, error } = await supabase
         .from('assignments')
         .select(`
           *,
@@ -42,25 +50,16 @@ export default function BrowseAssignmentsPage() {
           )
         `)
         .eq('status', 'open')
+        .neq('student_id', userId)
         .order('created_at', { ascending: false });
 
-      const { data, error } = await query;
+      if (error) throw error;
 
-      console.log('Assignments query result:', { data, error });
-
-      if (error) {
-        console.error('Supabase error:', error);
-        setError(error.message);
-        throw error;
-      }
-
-      // Check if writer has already bid
-      const assignmentsWithBidStatus = data?.map((assignment) => ({
+      const assignmentsWithBidStatus = (data || []).map((assignment) => ({
         ...assignment,
-        hasBid: assignment.bids?.some((bid) => bid.writer_id === profile.id),
-      })) || [];
+        hasBid: assignment.bids?.some((bid) => bid.writer_id === userId),
+      }));
 
-      console.log('Processed assignments:', assignmentsWithBidStatus);
       setAssignments(assignmentsWithBidStatus);
     } catch (error) {
       console.error('Error fetching assignments:', error);
@@ -116,15 +115,15 @@ export default function BrowseAssignmentsPage() {
             </div>
             <button
               onClick={fetchAssignments}
-              className="px-5 py-3 bg-brandBlue text-white rounded-lg hover:bg-brandAccent transition-colors font-medium"
+              className="inline-flex items-center gap-2 px-5 py-3 bg-brandBlue text-white rounded-lg hover:bg-brandAccent transition-colors font-medium"
             >
-              🔄 Refresh
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              Refresh
             </button>
           </div>
           {error && (
             <div className="mt-5 bg-red-50 border border-red-200 rounded-lg p-5">
               <p className="text-red-800 font-medium">Error: {error}</p>
-              <p className="text-sm text-red-600 mt-1">Check browser console for details</p>
             </div>
           )}
         </div>
@@ -197,21 +196,6 @@ export default function BrowseAssignmentsPage() {
             Showing <span className="font-semibold">{filteredAssignments.length}</span> available assignments
             {assignments.length > 0 && ` (${assignments.length} total)`}
           </p>
-          <button
-            onClick={() => {
-              console.log('Debug Info:', {
-                profileId: profile?.id,
-                profileType: profile?.user_type,
-                totalAssignments: assignments.length,
-                filteredCount: filteredAssignments.length,
-                assignments: assignments,
-              });
-              alert(`Total: ${assignments.length}, Filtered: ${filteredAssignments.length}. Check console for details.`);
-            }}
-            className="text-sm text-brandBlue hover:underline"
-          >
-            🐛 Debug Info
-          </button>
         </div>
 
         {/* Assignments List */}
@@ -238,8 +222,9 @@ export default function BrowseAssignmentsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       {assignment.hasBid && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
-                          ✓ You bid on this
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                          <Check className="h-3 w-3" aria-hidden="true" />
+                          You bid on this
                         </span>
                       )}
                       <h3 className="text-xl font-bold text-brandNavy">{assignment.title}</h3>

@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import SubmissionForm from '@/components/submissions/SubmissionForm';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 /**
@@ -32,6 +32,7 @@ export default function SubmissionPage() {
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
   const [error, setError] = useState(null);
+  const [revisionFeedback, setRevisionFeedback] = useState('');
 
   useEffect(() => {
     if (profile) {
@@ -77,12 +78,12 @@ export default function SubmissionPage() {
         return;
       }
 
-      // Check if there's already a submission under review
-      const { data: existingSubmissions, error: submissionError } = await supabase
+      // Look at previous deliveries: block if one is under review, and surface any
+      // revision feedback the student left on the last delivery
+      const { data: previousSubmissions, error: submissionError } = await supabase
         .from('submissions')
-        .select('id, status')
+        .select('id, status, student_feedback, revision_notes, revision_number, created_at')
         .eq('assignment_id', id)
-        .eq('status', 'submitted')
         .order('created_at', { ascending: false });
 
       if (submissionError) {
@@ -90,11 +91,17 @@ export default function SubmissionPage() {
         // Don't block submission, just log the error
       }
 
-      if (existingSubmissions && existingSubmissions.length > 0) {
+      if (previousSubmissions?.some((s) => s.status === 'submitted')) {
         setError('You already have a submission under review for this assignment');
         toast.error('Cannot submit while previous submission is under review');
         return;
       }
+
+      const latestRevision = previousSubmissions?.find((s) => s.status === 'revision_requested');
+
+      setRevisionFeedback(
+        latestRevision ? latestRevision.student_feedback || latestRevision.revision_notes || '' : ''
+      );
 
       setAssignment(assignmentData);
     } catch (err) {
@@ -138,8 +145,8 @@ export default function SubmissionPage() {
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600 dark:text-gray-400">Loading assignment details...</p>
+            <Loader2 className="w-12 h-12 text-brandBlue animate-spin mx-auto mb-4" aria-hidden="true" />
+            <p className="text-textBody">Loading assignment details...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -153,14 +160,14 @@ export default function SubmissionPage() {
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center max-w-md">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h2 className="text-2xl font-bold text-brandNavy mb-2">
               Access Denied
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-textBody mb-4">
               You are not authorized to submit work for this assignment. 
               Only the assigned writer can submit work.
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500">
+            <p className="text-sm text-textMuted">
               Redirecting to assignment details...
             </p>
           </div>
@@ -176,17 +183,17 @@ export default function SubmissionPage() {
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center max-w-md">
             <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h2 className="text-2xl font-bold text-brandNavy mb-2">
               {error || 'Assignment Not Found'}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-textBody mb-6">
               {error === 'You already have a submission under review for this assignment'
                 ? 'Please wait for the student to review your current submission before submitting again.'
                 : 'Unable to load the assignment details. Please try again.'}
             </p>
             <button
               onClick={handleCancel}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              className="px-6 py-2 bg-brandBlue hover:bg-brandAccent text-white font-medium rounded-lg transition-colors"
             >
               Back to Assignment
             </button>
@@ -204,17 +211,26 @@ export default function SubmissionPage() {
         <div className="mb-6">
           <button
             onClick={handleCancel}
-            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium mb-4 inline-flex items-center gap-2"
+            className="text-brandBlue hover:text-brandAccent font-medium mb-4 inline-flex items-center gap-2"
           >
-            ← Back to Assignment
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to Assignment
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="text-3xl font-bold text-brandNavy">
             Submit Your Work
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <p className="text-textBody mt-2">
             Upload your completed assignment files and add any notes for the student.
           </p>
         </div>
+
+        {/* Revision feedback from the student */}
+        {revisionFeedback && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6" role="status">
+            <p className="font-medium text-amber-900">The student requested a revision</p>
+            <p className="text-sm text-amber-800 mt-1 whitespace-pre-wrap">{revisionFeedback}</p>
+          </div>
+        )}
 
         {/* Submission Form */}
         <SubmissionForm

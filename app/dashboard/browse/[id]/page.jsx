@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 
 export default function AssignmentBidPage() {
@@ -22,11 +23,16 @@ export default function AssignmentBidPage() {
     cover_letter: '',
   });
 
+  const userId = profile?.id;
+
   useEffect(() => {
     fetchAssignmentAndBid();
-  }, [id]);
+  }, [id, userId]);
 
   const fetchAssignmentAndBid = async () => {
+    // The profile loads asynchronously; without it we cannot look up a bid.
+    if (!id || !userId) return;
+
     try {
       // Fetch assignment with student profile (specify the relationship)
       const { data: assignmentData, error: assignmentError } = await supabase
@@ -49,7 +55,7 @@ export default function AssignmentBidPage() {
         .from('bids')
         .select('*')
         .eq('assignment_id', id)
-        .eq('writer_id', profile.id)
+        .eq('writer_id', userId)
         .maybeSingle();
 
       if (bidError && bidError.code !== 'PGRST116') throw bidError;
@@ -178,11 +184,16 @@ export default function AssignmentBidPage() {
     );
   }
 
+  // Writers can post assignments too, and nobody should bid on their own job.
+  const isOwnAssignment = Boolean(assignment.student_id && assignment.student_id === userId);
+
   if (assignment.status !== 'open') {
     return (
       <DashboardLayout>
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="h-20 w-20 bg-brandIce rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="h-10 w-10 text-brandBlue" aria-hidden="true" />
+          </div>
           <h3 className="text-xl font-bold text-brandNavy mb-2">Assignment Not Available</h3>
           <p className="text-textBody mb-6">This assignment is no longer accepting bids</p>
           <Link
@@ -202,9 +213,10 @@ export default function AssignmentBidPage() {
         {/* Back Button */}
         <Link
           href="/dashboard/browse"
-          className="inline-flex items-center text-brandBlue hover:text-brandAccent mb-6"
+          className="inline-flex items-center gap-2 text-brandBlue hover:text-brandAccent mb-6"
         >
-          ← Back to Browse
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to Browse
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -283,6 +295,20 @@ export default function AssignmentBidPage() {
 
           {/* Bid Form */}
           <div className="lg:col-span-1">
+            {isOwnAssignment ? (
+              <div className="bg-white rounded-xl border border-brandGrid p-6">
+                <h2 className="text-xl font-bold text-brandNavy mb-2">Your assignment</h2>
+                <p className="text-textBody text-sm mb-5">
+                  You posted this job, so you cannot bid on it. Review the proposals you received instead.
+                </p>
+                <Link
+                  href={`/dashboard/assignments/${assignment.id}`}
+                  className="block w-full bg-brandBlue text-white py-3 rounded-lg font-semibold text-center hover:bg-brandAccent transition-colors"
+                >
+                  View bids
+                </Link>
+              </div>
+            ) : (
             <div className="bg-white rounded-xl border-2 border-brandBlue p-6 sticky top-6">
               <h2 className="text-2xl font-bold text-brandNavy mb-6">
                 {existingBid ? 'Update Your Bid' : 'Submit Your Bid'}
@@ -375,7 +401,10 @@ export default function AssignmentBidPage() {
 
                 {existingBid && existingBid.status === 'accepted' && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-green-800 font-medium text-center">✅ Your Bid Was Accepted!</p>
+                    <p className="flex items-center justify-center gap-2 text-green-800 font-medium">
+                      <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                      Your Bid Was Accepted!
+                    </p>
                     <p className="text-sm text-green-600 text-center mt-1">
                       Wait for the student to complete payment
                     </p>
@@ -383,6 +412,7 @@ export default function AssignmentBidPage() {
                 )}
               </form>
             </div>
+            )}
           </div>
         </div>
       </div>

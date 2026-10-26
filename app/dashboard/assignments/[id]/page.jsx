@@ -6,7 +6,12 @@ import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { ArrowLeft, CheckCircle2, Inbox, MessageSquare, Star, XCircle } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import SubmissionReview from '@/components/submissions/SubmissionReview';
+import ReviewCard from '@/components/reviews/ReviewCard';
+import ReviewForm from '@/components/reviews/ReviewForm';
+import { statusLabel, statusTone } from '@/lib/status';
 
 export default function AssignmentDetailPage() {
   const { id } = useParams();
@@ -14,12 +19,41 @@ export default function AssignmentDetailPage() {
   const router = useRouter();
   const [assignment, setAssignment] = useState(null);
   const [bids, setBids] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     fetchAssignmentDetails();
   }, [id]);
+
+  /**
+   * Reviews are read through the API rather than the anon client: the deployed
+   * `reviews` policies only guarantee what the API route already verifies.
+   */
+  const fetchReviews = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) return;
+
+      const response = await fetch(`/api/reviews?assignmentId=${id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
+        console.error('Failed to load reviews:', result?.error || response.status);
+        return;
+      }
+
+      setReviews(result.reviews || []);
+    } catch (reviewError) {
+      console.error('Failed to load reviews:', reviewError);
+    }
+  };
 
   const fetchAssignmentDetails = async () => {
     try {
@@ -42,6 +76,21 @@ export default function AssignmentDetailPage() {
 
       if (bidsError) throw bidsError;
       setBids(bidsData || []);
+
+      // Fetch submissions (newest first) so the student can review the latest work
+      const { data: submissionsData, error: submissionsError } = await supabase
+        .from('submissions')
+        .select('*')
+        .eq('assignment_id', id)
+        .order('revision_number', { ascending: false });
+
+      if (submissionsError) throw submissionsError;
+      setSubmissions(submissionsData || []);
+
+      // Only completed work can be reviewed
+      if (assignmentData.status === 'completed') {
+        await fetchReviews();
+      }
     } catch (error) {
       console.error('Error fetching assignment:', error);
       toast.error('Failed to load assignment');
@@ -89,7 +138,21 @@ export default function AssignmentDetailPage() {
       if (assignmentError) throw assignmentError;
 
       toast.success('Bid accepted! Proceed to payment.');
-      
+
+      // Ring the writer's bell. Best-effort: the award is already committed, and a
+      // failure here only costs a notification.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        fetch('/api/bids/accepted', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ bidId }),
+        }).catch((notifyError) => console.error('Bid notification failed:', notifyError));
+      }
+
       // In a real app, redirect to payment page
       // For now, just refresh the page
       fetchAssignmentDetails();
@@ -147,18 +210,18 @@ export default function AssignmentDetailPage() {
     );
   }
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      open: 'bg-blue-100 text-blue-800',
-      assigned: 'bg-yellow-100 text-yellow-800',
-      in_progress: 'bg-purple-100 text-purple-800',
-      under_review: 'bg-orange-100 text-orange-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-gray-100 text-gray-800',
-      disputed: 'bg-red-100 text-red-800',
-    };
-    return badges[status] || badges.open;
-  };
+  const getStatusBadge = (status) => statusTone(status);
+
+  const latestSubmission = submissions[0] || null;
+  const isOwner = profile?.id === assignment.student_id;
+  const isAssignedWriter = profile?.id === assignment.assigned_writer_id;
+  const canMessage = Boolean(assignment.assigned_writer_id) && (isOwner || isAssignedWriter);
+
+  const acceptedBid = bids.find((bid) => bid.status === 'accepted') || null;
+  const myReview = reviews.find((review) => review.reviewer_id === profile?.id) || null;
+  const receivedReview = reviews.find((review) => review.reviewee_id === profile?.id) || null;
+  const canReview =
+    isOwner && assignment.status === 'completed' && Boolean(assignment.assigned_writer_id);
 
   return (
     <DashboardLayout>
@@ -166,9 +229,10 @@ export default function AssignmentDetailPage() {
         {/* Back Button */}
         <Link
           href="/dashboard/assignments"
-          className="inline-flex items-center text-brandBlue hover:text-brandAccent mb-6"
+          className="inline-flex items-center gap-2 text-brandBlue hover:text-brandAccent mb-6"
         >
-          ← Back to Assignments
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to Assignments
         </Link>
 
         {/* Assignment Details Card */}
@@ -176,13 +240,25 @@ export default function AssignmentDetailPage() {
           <div className="flex justify-between items-start mb-6">
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-brandNavy mb-2">{assignment.title}</h1>
-              <span
-                className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(
-                  assignment.status
-                )}`}
-              >
-                {assignment.status.replace('_', ' ')}
-              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(
+                    assignment.status
+                  )}`}
+                >
+                  {statusLabel(assignment.status)}
+                </span>
+
+                {canMessage && (
+                  <Link
+                    href={`/dashboard/assignments/${assignment.id}/messages`}
+                    className="inline-flex items-center gap-2 rounded-lg border border-brandGrid px-3 py-1.5 text-sm font-medium text-brandBlue transition-colors hover:border-brandBlue hover:bg-brandIce"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Message {isOwner ? 'writer' : 'student'}
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
 
@@ -239,6 +315,34 @@ export default function AssignmentDetailPage() {
           ) : null}
         </div>
 
+        {/* Submission Review (student only) */}
+        {isOwner && latestSubmission && (
+          <SubmissionReview
+            submission={latestSubmission}
+            submissions={submissions}
+            onActionComplete={fetchAssignmentDetails}
+          />
+        )}
+
+        {/* Rating the writer (student, after approval) */}
+        {canReview && (
+          <div className="mb-6">
+            <ReviewForm
+              assignmentId={assignment.id}
+              writerName={acceptedBid?.profiles?.full_name}
+              existingReview={myReview}
+              onSaved={fetchReviews}
+            />
+          </div>
+        )}
+
+        {/* The review the student left (writer) */}
+        {isAssignedWriter && receivedReview && (
+          <div className="mb-6">
+            <ReviewCard review={receivedReview} heading="Student review" />
+          </div>
+        )}
+
         {/* Bids Section */}
         <div>
           <div className="flex justify-between items-center mb-6">
@@ -249,7 +353,9 @@ export default function AssignmentDetailPage() {
 
           {bids.length === 0 ? (
             <div className="bg-white rounded-xl border border-brandGrid p-12 text-center">
-              <div className="text-6xl mb-4">📭</div>
+              <div className="h-20 w-20 bg-brandIce rounded-full flex items-center justify-center mx-auto mb-4">
+                <Inbox className="h-10 w-10 text-brandBlue" aria-hidden="true" />
+              </div>
               <h3 className="text-xl font-bold text-brandNavy mb-2">No bids yet</h3>
               <p className="text-textBody">
                 Writers will start bidding on your assignment soon. Check back later!
@@ -279,8 +385,9 @@ export default function AssignmentDetailPage() {
                         <div>
                           <h3 className="font-bold text-brandNavy">{bid.profiles?.full_name || 'Writer'}</h3>
                           <div className="flex items-center gap-2 text-sm">
-                            <span className="text-textMuted">
-                              ⭐ {bid.profiles?.rating?.toFixed(1) || '0.0'}
+                            <span className="inline-flex items-center gap-1 text-textMuted">
+                              <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+                              {bid.profiles?.rating?.toFixed(1) || '0.0'}
                             </span>
                             <span className="text-textMuted">•</span>
                             <span className="text-textMuted">
@@ -326,7 +433,10 @@ export default function AssignmentDetailPage() {
 
                   {bid.status === 'accepted' && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <p className="text-green-800 font-medium">✅ Bid Accepted</p>
+                      <p className="flex items-center gap-2 text-green-800 font-medium">
+                        <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                        Bid Accepted
+                      </p>
                       <p className="text-sm text-green-600 mt-1">
                         Proceed to payment to start the work
                       </p>
@@ -335,7 +445,10 @@ export default function AssignmentDetailPage() {
 
                   {bid.status === 'rejected' && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      <p className="text-gray-600">❌ Bid Rejected</p>
+                      <p className="flex items-center gap-2 text-gray-600">
+                        <XCircle className="h-4 w-4" aria-hidden="true" />
+                        Bid Rejected
+                      </p>
                     </div>
                   )}
                 </div>

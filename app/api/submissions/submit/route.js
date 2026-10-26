@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendNotification } from '@/lib/notify';
 import { uploadMultipleFiles } from '@/lib/supabaseStorage';
 
 /**
@@ -11,38 +12,70 @@ import { uploadMultipleFiles } from '@/lib/supabaseStorage';
  * 
  * Request Body:
  * - assignmentId: string (required)
- * - writerId: string (required)
  * - submissionText: string (optional)
  * - files: File[] (required, at least 1 file)
- * 
+ *
+ * Headers:
+ * - Authorization: Bearer <supabase access token> (required)
+ *
  * Response:
  * - success: boolean
  * - submissionId: string
- * - fileUrls: string[]
+ * - filePaths: string[] (storage paths in the private 'submissions' bucket)
  * - message: string
  * - error: string (if failure)
  */
 export async function POST(request) {
   try {
-    // Initialize Supabase client with service role for server-side operations
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Missing Supabase configuration');
+    // Service-role client for server-side writes. It bypasses RLS, so the
+    // caller must be authenticated explicitly below.
+    let supabase;
+    try {
+      supabase = getSupabaseAdmin();
+    } catch (configError) {
+      console.error('Supabase server configuration error:', configError.message);
       return NextResponse.json(
         { success: false, error: 'Server configuration error' },
         { status: 500 }
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Authenticate the caller. The writer identity comes from the verified
+    // token, never from the request body.
+    const authHeader = request.headers.get('authorization') || '';
+    const accessToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+    if (!accessToken) {
+      return NextResponse.json(
+        { success: false, error: 'Missing authorization token' },
+        { status: 401 }
+      );
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(accessToken);
+
+    if (authError || !authData?.user) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid or expired session. Please sign in again.' },
+        { status: 401 }
+      );
+    }
+
+    const writerId = authData.user.id;
 
     // Parse form data
     const formData = await request.formData();
     const assignmentId = formData.get('assignmentId');
-    const writerId = formData.get('writerId');
+    const claimedWriterId = formData.get('writerId');
     const submissionText = formData.get('submissionText');
+
+    // Reject attempts to submit work on behalf of another user
+    if (claimedWriterId && claimedWriterId !== writerId) {
+      return NextResponse.json(
+        { success: false, error: 'writerId does not match the authenticated user' },
+        { status: 403 }
+      );
+    }
     
     // Extract files from form data
     const files = [];
@@ -53,11 +86,11 @@ export async function POST(request) {
     }
 
     // Validation: Check required fields
-    if (!assignmentId || !writerId) {
+    if (!assignmentId) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Missing required fields: assignmentId and writerId are required' 
+          error: 'Missing required field: assignmentId is required' 
         },
         { status: 400 }
       );
@@ -77,7 +110,7 @@ export async function POST(request) {
     // Validate assignment exists
     const { data: assignment, error: assignmentFetchError } = await supabase
       .from('assignments')
-      .select('id, status, assigned_writer_id, student_id')
+      .select('id, title, status, assigned_writer_id, student_id')
       .eq('id', assignmentId)
       .single();
 
@@ -197,10 +230,13 @@ export async function POST(request) {
 
     // Step 2: Upload files to Supabase Storage
     try {
+      // Pass the service-role client so uploads are not attempted as 'anon'
       const uploadResult = await uploadMultipleFiles(
         files,
         assignmentId,
-        submissionId
+        submissionId,
+        null,
+        supabase
       );
 
       if (!uploadResult.success) {
@@ -221,19 +257,25 @@ export async function POST(request) {
         );
       }
 
-      // Step 3: Update submission with file URLs
+      // Step 3: Update submission with the uploaded file references
       const { error: updateError } = await supabase
         .from('submissions')
         .update({ 
-          file_urls: uploadResult.uploadedUrls,
+          // The submissions bucket is private, so only the storage path is
+          // persisted. Read it back with getFileUrl(path) to obtain a signed URL.
+          file_urls: uploadResult.uploadedPaths,
           updated_at: new Date().toISOString()
         })
         .eq('id', submissionId);
 
       if (updateError) {
-        console.error('Failed to update submission with file URLs:', updateError);
+        console.error('Failed to update submission with file references:', updateError);
         
-        // Attempt rollback
+        // Attempt rollback: remove the uploaded files, then the record
+        await supabase.storage
+          .from('submissions')
+          .remove(uploadResult.uploadedPaths);
+
         await supabase
           .from('submissions')
           .delete()
@@ -264,6 +306,16 @@ export async function POST(request) {
         // Log warning but don't rollback - submission is valid
         // Manual intervention may be needed to update status
         console.warn(`Submission ${submissionId} created but assignment status update failed`);
+      } else {
+        // Tell the student there is work waiting for review. Best-effort only:
+        // the submission is already saved, so a failure must not fail the request.
+        await sendNotification(supabase, {
+          userId: assignment.student_id,
+          type: 'submission_created',
+          title: 'New Submission',
+          message: `Revision ${revisionNumber} was submitted for "${assignment.title}". Review the work to approve it or request changes.`,
+          link: `/dashboard/assignments/${assignmentId}`,
+        });
       }
 
       // Success response
@@ -271,7 +323,7 @@ export async function POST(request) {
         {
           success: true,
           submissionId: submissionId,
-          fileUrls: uploadResult.uploadedUrls,
+          filePaths: uploadResult.uploadedPaths,
           revisionNumber: revisionNumber,
           message: 'Work submitted successfully! The student will be notified to review your submission.'
         },

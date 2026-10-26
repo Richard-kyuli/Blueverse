@@ -147,20 +147,59 @@ ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 -- ============================================================================
 -- NOTIFICATIONS TABLE
 -- ============================================================================
-DROP POLICY IF EXISTS "Enable read for user" ON public.notifications;
-DROP POLICY IF EXISTS "Enable update for user" ON public.notifications;
+-- Policies are dropped from the catalog rather than by name: this file creates
+-- "Enable read for user" while supabase-schema.sql creates "Users can view own
+-- notifications", so a half-applied run can leave RLS enabled with no policy at
+-- all. PostgREST then returns an empty set instead of an error, and the
+-- dashboard bell silently looks empty (its load error stays hidden).
+DO $$
+DECLARE
+  policy_row RECORD;
+BEGIN
+  FOR policy_row IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'notifications'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.notifications', policy_row.policyname);
+  END LOOP;
+END $$;
 
-CREATE POLICY "Enable read for user" 
-ON public.notifications FOR SELECT 
-TO authenticated
-USING (auth.uid() = user_id);
-
-CREATE POLICY "Enable update for user" 
-ON public.notifications FOR UPDATE 
-TO authenticated
-USING (auth.uid() = user_id);
+-- markNotificationAsRead() writes both columns; a missing one 400s the UPDATE
+-- and the badge never clears. A NULL is_read also hides it, since the bell
+-- counts rows where is_read is false.
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false;
+UPDATE public.notifications SET is_read = false WHERE is_read IS NULL;
+ALTER TABLE public.notifications ALTER COLUMN is_read SET DEFAULT false;
+ALTER TABLE public.notifications ALTER COLUMN is_read SET NOT NULL;
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Enable read for user"
+ON public.notifications FOR SELECT
+TO authenticated
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Enable update for user"
+ON public.notifications FOR UPDATE
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- RLS applies on top of GRANTs, so a revoked GRANT also reads as an empty
+-- table. Notifications are written server-side with the service role only
+-- (lib/notify.js), never by the browser.
+GRANT SELECT, UPDATE ON public.notifications TO authenticated;
+REVOKE INSERT, DELETE ON public.notifications FROM authenticated;
+
+-- Lets the bell receive INSERT events instead of waiting for its 60s poll
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+  WHEN undefined_object THEN NULL;
+END $$;
 
 -- ============================================================================
 -- TRANSACTIONS TABLE

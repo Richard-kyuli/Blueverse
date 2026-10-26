@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import { X, User, Mail, Phone, MapPin, Briefcase, Save, Lock, Eye, EyeOff, Award, DollarSign, Camera, Upload } from 'lucide-react';
+import { X, User, Mail, Phone, MapPin, Briefcase, Save, Lock, Eye, EyeOff, Award, DollarSign, Camera, Upload, Check } from 'lucide-react';
 
 export default function ProfileModal({ isOpen, onClose }) {
   const { profile, user } = useAuth();
@@ -588,8 +588,13 @@ export default function ProfileModal({ isOpen, onClose }) {
 
                 {/* Password Match Indicator */}
                 {passwordData.newPassword && passwordData.confirmPassword && (
-                  <div className={`text-sm ${passwordData.newPassword === passwordData.confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
-                    {passwordData.newPassword === passwordData.confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+                  <div className={`flex items-center gap-1.5 text-sm ${passwordData.newPassword === passwordData.confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
+                    {passwordData.newPassword === passwordData.confirmPassword ? (
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {passwordData.newPassword === passwordData.confirmPassword ? 'Passwords match' : 'Passwords do not match'}
                   </div>
                 )}
 

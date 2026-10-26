@@ -23,9 +23,15 @@ Creates a new submission record and uploads associated files to Supabase Storage
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `assignmentId` | string | Yes | UUID of the assignment |
-| `writerId` | string | Yes | UUID of the writer submitting work |
+| `writerId` | string | No | Not used for authorization — the writer is taken from the bearer token. If sent, it must match the authenticated user |
 | `submissionText` | string | No | Optional notes/description from writer |
 | `file_0`, `file_1`, ... | File | Yes | At least one file required. Use `file_N` naming pattern |
+
+### Request Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Authorization` | Yes | `Bearer <supabase access token>` belonging to the assigned writer |
 
 ### File Requirements
 
@@ -44,14 +50,16 @@ Creates a new submission record and uploads associated files to Supabase Storage
 {
   "success": true,
   "submissionId": "uuid-string",
-  "fileUrls": [
-    "https://project.supabase.co/storage/v1/object/public/submissions/...",
-    "https://project.supabase.co/storage/v1/object/public/submissions/..."
+  "filePaths": [
+    "{assignment_id}/{submission_id}/1698345600000-essay.pdf"
   ],
   "revisionNumber": 1,
   "message": "Work submitted successfully! The student will be notified to review your submission."
 }
 ```
+
+`filePaths` are storage paths inside the private `submissions` bucket, not public URLs.
+Generate a signed URL with `getFileUrl(path)` from `lib/supabaseStorage` when rendering them.
 
 ### Error Responses
 
@@ -64,12 +72,32 @@ Creates a new submission record and uploads associated files to Supabase Storage
 ```
 
 **Common 400 Errors:**
-- Missing required fields (assignmentId, writerId)
+- Missing required field (assignmentId)
 - No files provided
 - Invalid assignment status (not 'assigned' or 'in_progress')
 - Submission already under review (concurrent submission prevention)
 
+#### 401 Unauthorized
+```json
+{
+  "success": false,
+  "error": "Missing authorization token"
+}
+```
+
+**Cause:** The `Authorization: Bearer <access token>` header is absent or the token is invalid/expired
+
 #### 403 Forbidden
+```json
+{
+  "success": false,
+  "error": "writerId does not match the authenticated user"
+}
+```
+
+**Cause:** The `writerId` form field does not match the user identified by the access token
+
+#### 403 Forbidden (not assigned)
 ```json
 {
   "success": false,
@@ -107,10 +135,11 @@ Creates a new submission record and uploads associated files to Supabase Storage
 
 ### Assignment Validation
 
-1. **Assignment Exists:** Assignment must exist in database
-2. **Writer Authorization:** `writerId` must match `assignment.assigned_writer_id`
-3. **Valid Status:** Assignment status must be `assigned` or `in_progress`
-4. **No Pending Review:** No other submission can have status `submitted` for this assignment
+1. **Authenticated:** A valid Supabase access token must be presented, and the token's user must match any `writerId` sent in the body
+2. **Assignment Exists:** Assignment must exist in database
+3. **Writer Authorization:** The authenticated user must equal `assignment.assigned_writer_id`
+4. **Valid Status:** Assignment status must be `assigned` or `in_progress`
+5. **No Pending Review:** No other submission can have status `submitted` for this assignment
 
 ### File Validation
 
@@ -277,8 +306,9 @@ The endpoint relies on Supabase RLS policies for:
 
 ### Environment Variables
 - `NEXT_PUBLIC_SUPABASE_URL` - Required
-- `SUPABASE_SERVICE_ROLE_KEY` - Optional (falls back to anon key)
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Required if service role key not set
+- `SUPABASE_SERVICE_ROLE_KEY` - Required (server-side DB/storage writes; the endpoint returns 500 without it)
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` is still needed by the browser client, but is never used for writes in this endpoint.
 
 ---
 
@@ -286,14 +316,16 @@ The endpoint relies on Supabase RLS policies for:
 
 | Status | Code | Meaning | Resolution |
 |--------|------|---------|------------|
-| 400 | Missing required fields | assignmentId or writerId not provided | Include both parameters |
+| 400 | Missing required field | assignmentId not provided | Include assignmentId |
 | 400 | No files | No files in request | Add at least one file with `file_N` naming |
 | 400 | Invalid status | Assignment status doesn't allow submission | Wait for appropriate status |
 | 400 | Pending review | Another submission already under review | Wait for review completion |
-| 403 | Not authorized | Writer not assigned to assignment | Verify writer assignment |
+| 401 | Unauthorized | Missing or invalid access token | Sign in again and resend the request |
+| 403 | Not authorized | Writer not assigned to assignment, or writerId mismatch | Verify writer assignment |
 | 404 | Not found | Assignment doesn't exist | Verify assignment ID |
 | 500 | Upload failed | File upload to storage failed | Check storage bucket, retry |
 | 500 | Database error | Database operation failed | Check logs, contact support |
+| 500 | Server configuration error | `SUPABASE_SERVICE_ROLE_KEY` missing | Add it to `.env.local` and restart |
 
 ---
 
@@ -302,10 +334,11 @@ The endpoint relies on Supabase RLS policies for:
 ### JavaScript/TypeScript
 
 ```javascript
-async function submitWork(assignmentId, writerId, files, notes) {
+async function submitWork(assignmentId, files, notes) {
+  const { data: { session } } = await supabase.auth.getSession();
+
   const formData = new FormData();
   formData.append('assignmentId', assignmentId);
-  formData.append('writerId', writerId);
   formData.append('submissionText', notes);
   
   files.forEach((file, index) => {
@@ -314,6 +347,7 @@ async function submitWork(assignmentId, writerId, files, notes) {
   
   const response = await fetch('/api/submissions/submit', {
     method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}` },
     body: formData,
   });
   
@@ -330,8 +364,8 @@ async function submitWork(assignmentId, writerId, files, notes) {
 
 ```bash
 curl -X POST http://localhost:3000/api/submissions/submit \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -F "assignmentId=123e4567-e89b-12d3-a456-426614174000" \
-  -F "writerId=987fcdeb-51a2-43d1-b789-123456789abc" \
   -F "submissionText=Completed work as per requirements" \
   -F "file_0=@essay.pdf" \
   -F "file_1=@sources.zip"

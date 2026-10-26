@@ -22,6 +22,9 @@ vi.mock('next/server', () => ({
 // Mock Supabase client
 const mockSupabaseClient = {
   from: vi.fn(),
+  auth: {
+    getUser: vi.fn()
+  },
   storage: {
     from: vi.fn()
   }
@@ -45,10 +48,21 @@ describe('POST /api/submissions/submit', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     vi.clearAllMocks();
+
+    // Drop any queued return values left over from previous tests
+    mockSupabaseClient.from.mockReset();
+    mockSupabaseClient.storage.from.mockReset();
     
     // Reset environment variables
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
+
+    // Default: the request carries a valid token for writer-123
+    mockSupabaseClient.auth.getUser.mockResolvedValue({
+      data: { user: { id: 'writer-123' } },
+      error: null
+    });
   });
 
   /**
@@ -71,7 +85,13 @@ describe('POST /api/submissions/submit', () => {
   /**
    * Helper to create mock request
    */
-  const createMockRequest = (formData) => ({
+  const createMockRequest = (formData, token = 'test-access-token') => ({
+    headers: {
+      get: (name) =>
+        name.toLowerCase() === 'authorization'
+          ? (token ? `Bearer ${token}` : null)
+          : null
+    },
     formData: async () => formData
   });
 
@@ -95,15 +115,57 @@ describe('POST /api/submissions/submit', () => {
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: false,
-          error: expect.stringContaining('Missing required fields')
+          error: expect.stringContaining('assignmentId is required')
         }),
         expect.objectContaining({ status: 400 })
       );
     });
 
-    it('should return 400 when writerId is missing', async () => {
+    it('should return 401 when the authorization header is missing', async () => {
       const formData = createMockFormData({
         assignmentId: 'assignment-123',
+        files: [createMockFile('test.pdf')]
+      });
+      const request = createMockRequest(formData, null);
+
+      await POST(request);
+
+      expect(NextResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: 'Missing authorization token'
+        }),
+        expect.objectContaining({ status: 401 })
+      );
+    });
+
+    it('should return 401 when the access token is invalid', async () => {
+      const formData = createMockFormData({
+        assignmentId: 'assignment-123',
+        files: [createMockFile('test.pdf')]
+      });
+      const request = createMockRequest(formData);
+
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'invalid JWT' }
+      });
+
+      await POST(request);
+
+      expect(NextResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: expect.stringContaining('Invalid or expired session')
+        }),
+        expect.objectContaining({ status: 401 })
+      );
+    });
+
+    it('should return 403 when writerId does not match the authenticated user', async () => {
+      const formData = createMockFormData({
+        assignmentId: 'assignment-123',
+        writerId: 'someone-else',
         files: [createMockFile('test.pdf')]
       });
       const request = createMockRequest(formData);
@@ -113,9 +175,9 @@ describe('POST /api/submissions/submit', () => {
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: false,
-          error: expect.stringContaining('Missing required fields')
+          error: 'writerId does not match the authenticated user'
         }),
-        expect.objectContaining({ status: 400 })
+        expect.objectContaining({ status: 403 })
       );
     });
 
@@ -174,6 +236,12 @@ describe('POST /api/submissions/submit', () => {
         files: [createMockFile('test.pdf')]
       });
       const request = createMockRequest(formData);
+
+      // The authenticated user matches the body but is not the assigned writer
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'wrong-writer-id' } },
+        error: null
+      });
 
       // Mock assignment with different writer
       mockSupabaseClient.from.mockReturnValueOnce({
@@ -262,10 +330,10 @@ describe('POST /api/submissions/submit', () => {
       mockSupabaseClient.from.mockReturnValueOnce({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        mockResolvedValue: {
+        then: (resolve) => resolve({
           data: [{ id: 'existing-submission', status: 'submitted' }],
           error: null
-        }
+        })
       });
 
       await POST(request);
@@ -300,6 +368,7 @@ describe('POST /api/submissions/submit', () => {
         single: vi.fn().mockResolvedValue({
           data: {
             id: 'assignment-123',
+            title: 'Essay on Climate Policy',
             status: 'assigned',
             assigned_writer_id: 'writer-123',
             student_id: 'student-123'
@@ -312,20 +381,20 @@ describe('POST /api/submissions/submit', () => {
       mockSupabaseClient.from.mockReturnValueOnce({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        mockResolvedValue: {
+        then: (resolve) => resolve({
           data: [],
           error: null
-        }
+        })
       });
 
       // Mock count submissions - this is the first submission
       mockSupabaseClient.from.mockReturnValueOnce({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        mockResolvedValue: {
+        then: (resolve) => resolve({
           count: 0,
           error: null
-        }
+        })
       });
 
       // Mock find parent submission - none
@@ -364,6 +433,10 @@ describe('POST /api/submissions/submit', () => {
         uploadedUrls: [
           'https://example.com/submissions/assignment-123/submission-456/essay.pdf',
           'https://example.com/submissions/assignment-123/submission-456/sources.docx'
+        ],
+        uploadedPaths: [
+          'assignment-123/submission-456/essay.pdf',
+          'assignment-123/submission-456/sources.docx'
         ]
       });
 
@@ -383,6 +456,10 @@ describe('POST /api/submissions/submit', () => {
         })
       });
 
+      // Mock notification insert for the student
+      const notificationInsert = vi.fn().mockResolvedValue({ error: null });
+      mockSupabaseClient.from.mockReturnValueOnce({ insert: notificationInsert });
+
       await POST(request);
 
       // Verify successful response
@@ -390,7 +467,7 @@ describe('POST /api/submissions/submit', () => {
         expect.objectContaining({
           success: true,
           submissionId: mockSubmissionId,
-          fileUrls: expect.arrayContaining([
+          filePaths: expect.arrayContaining([
             expect.stringContaining('essay.pdf'),
             expect.stringContaining('sources.docx')
           ]),
@@ -400,11 +477,23 @@ describe('POST /api/submissions/submit', () => {
         expect.objectContaining({ status: 201 })
       );
 
-      // Verify uploadMultipleFiles was called with correct parameters
+      // Verify uploadMultipleFiles was called with the service-role client
       expect(uploadMultipleFiles).toHaveBeenCalledWith(
         expect.any(Array),
         'assignment-123',
-        mockSubmissionId
+        mockSubmissionId,
+        null,
+        mockSupabaseClient
+      );
+
+      // Verify the student was told there is work waiting for review
+      expect(notificationInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: 'student-123',
+          type: 'submission_created',
+          is_read: false,
+          link: '/dashboard/assignments/assignment-123'
+        })
       );
     });
   });
@@ -437,7 +526,7 @@ describe('POST /api/submissions/submit', () => {
       mockSupabaseClient.from.mockReturnValueOnce({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        mockResolvedValue: { data: [], error: null }
+        then: (resolve) => resolve({ data: [], error: null })
       });
 
       // Mock count and parent submission queries
@@ -445,7 +534,7 @@ describe('POST /api/submissions/submit', () => {
         .mockReturnValueOnce({
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
-          mockResolvedValue: { count: 0, error: null }
+          then: (resolve) => resolve({ count: 0, error: null })
         })
         .mockReturnValueOnce({
           select: vi.fn().mockReturnThis(),
@@ -505,26 +594,61 @@ describe('POST /api/submissions/submit', () => {
       });
       const request = createMockRequest(formData);
 
-      // Setup mocks for successful submission
+      // Setup mocks for a successful submission
       mockSupabaseClient.from
         .mockReturnValueOnce({
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           single: vi.fn().mockResolvedValue({
-            data: { id: 'assignment-123', status: 'assigned', assigned_writer_id: 'writer-123' },
+            data: {
+              id: 'assignment-123',
+              title: 'Essay on Climate Policy',
+              status: 'assigned',
+              assigned_writer_id: 'writer-123',
+              student_id: 'student-123'
+            },
             error: null
           })
         })
         .mockReturnValueOnce({
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
-          mockResolvedValue: { data: [], error: null }
+          then: (resolve) => resolve({ data: [], error: null })
         })
         .mockReturnValueOnce({
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
-          mockResolvedValue: { count: 0, error: null }
+          then: (resolve) => resolve({ count: 0, error: null })
+        })
+        .mockReturnValueOnce({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+        })
+        .mockReturnValueOnce({
+          insert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({ data: { id: 'submission-456' }, error: null })
+        })
+        .mockReturnValueOnce({
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ error: null })
+        })
+        .mockReturnValueOnce({
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ error: null })
+        })
+        .mockReturnValueOnce({
+          insert: vi.fn().mockResolvedValue({ error: null })
         });
+
+      uploadMultipleFiles.mockResolvedValue({
+        success: true,
+        uploadedUrls: ['https://example.com/submissions/assignment-123/submission-456/test.pdf'],
+        uploadedPaths: ['assignment-123/submission-456/test.pdf']
+      });
 
       await POST(request);
 
