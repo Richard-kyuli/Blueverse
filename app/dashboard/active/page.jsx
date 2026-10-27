@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { AlertTriangle, Clock, Eye, MessageSquare, Search, Upload, Zap } from 'lucide-react';
+import { Clock, Eye, MessageSquare, Search, Upload, Zap } from 'lucide-react';
+import DisputeNotice from '@/components/disputes/DisputeNotice';
 import {
   ACTIVE_ASSIGNMENT_STATUSES,
   IN_REVIEW_STATUSES,
@@ -17,21 +18,33 @@ import {
   statusTone,
 } from '@/lib/status';
 
-const ASSIGNMENT_SELECT = `
-  id,
-  title,
-  subject,
-  academic_level,
-  deadline,
-  status,
-  final_price,
-  budget_min,
-  budget_max,
-  assigned_at,
-  completed_at,
-  student_id,
-  profiles:student_id ( full_name )
-`;
+// The dispute columns only exist after supabase-disputes-workflow.sql, so this
+// page loads them separately and falls back to the plain column list rather than
+// failing the whole request with 42703.
+const BASE_COLUMNS = [
+  'id',
+  'title',
+  'subject',
+  'academic_level',
+  'deadline',
+  'status',
+  'final_price',
+  'budget_min',
+  'budget_max',
+  'assigned_at',
+  'completed_at',
+  'student_id',
+];
+
+const DISPUTE_COLUMNS = ['dispute_category', 'dispute_details', 'disputed_at', 'disputed_by'];
+
+const STUDENT_JOIN = 'profiles:student_id ( full_name )';
+
+const selectColumns = (withDispute) =>
+  [...BASE_COLUMNS, ...(withDispute ? DISPUTE_COLUMNS : []), STUDENT_JOIN].join(',\n  ');
+
+const ASSIGNMENT_SELECT = selectColumns(true);
+const ASSIGNMENT_SELECT_WITHOUT_DISPUTE = selectColumns(false);
 
 const SUBMISSION_SELECT = 'id, assignment_id, status, revision_notes, created_at';
 
@@ -81,10 +94,9 @@ function JobCard({ assignment, submission }) {
           )}
 
           {assignment.status === 'disputed' && (
-            <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
-              This job is under dispute. Reply to the student in Messages.
-            </p>
+            <div className="mt-3">
+              <DisputeNotice assignment={assignment} viewerRole="writer" compact />
+            </div>
           )}
         </div>
 
@@ -164,12 +176,23 @@ export default function ActiveJobsPage() {
       setError(null);
 
       try {
-        const { data, error: assignmentsError } = await supabase
-          .from('assignments')
-          .select(ASSIGNMENT_SELECT)
-          .eq('assigned_writer_id', userId)
-          .in('status', OPEN_WORK_STATUSES)
-          .order('deadline', { ascending: true });
+        const runJobsQuery = (select) =>
+          supabase
+            .from('assignments')
+            .select(select)
+            .eq('assigned_writer_id', userId)
+            .in('status', OPEN_WORK_STATUSES)
+            .order('deadline', { ascending: true });
+
+        let { data, error: assignmentsError } = await runJobsQuery(ASSIGNMENT_SELECT);
+
+        if (
+          assignmentsError &&
+          (assignmentsError.code === '42703' || /column .* does not exist/i.test(assignmentsError.message || ''))
+        ) {
+          // Pre-migration deployment: the jobs still load, without the reason.
+          ({ data, error: assignmentsError } = await runJobsQuery(ASSIGNMENT_SELECT_WITHOUT_DISPUTE));
+        }
 
         if (assignmentsError) throw assignmentsError;
         if (cancelled) return;

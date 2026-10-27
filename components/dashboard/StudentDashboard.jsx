@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { FileText, Zap, CheckCircle, DollarSign, PlusCircle, MessageSquare, Eye, ArrowRight } from 'lucide-react';
+import { FileText, Zap, CheckCircle, DollarSign, PlusCircle, MessageSquare, Eye, ArrowRight, AlertTriangle } from 'lucide-react';
 import { statusLabel, statusTone } from '@/lib/status';
+import DisputeNotice from '@/components/disputes/DisputeNotice';
 
 export default function StudentDashboard() {
   const { profile } = useAuth();
@@ -16,6 +17,7 @@ export default function StudentDashboard() {
     totalSpent: 0,
   });
   const [recentAssignments, setRecentAssignments] = useState([]);
+  const [disputedAssignments, setDisputedAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -46,6 +48,9 @@ export default function StudentDashboard() {
 
       const all = assignments || [];
       setRecentAssignments(all.slice(0, 5));
+      // Disputes are surfaced on their own because they need attention and
+      // would otherwise look like ordinary work in progress.
+      setDisputedAssignments(all.filter((a) => a.status === 'disputed'));
 
       // Calculate stats
       const total = all.length;
@@ -109,6 +114,50 @@ export default function StudentDashboard() {
         <h1 className="text-3xl md:text-4xl font-bold text-brandNavy mb-2">Welcome back, {profile.full_name}!</h1>
         <p className="text-base md:text-lg text-textBody">Here's what's happening with your assignments</p>
       </header>
+
+      {/* Disputes: the one thing on this page that needs a decision */}
+      {disputedAssignments.length > 0 && (
+        <section aria-labelledby="disputes-heading">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <h2
+              id="disputes-heading"
+              className="flex items-center gap-2 text-xl md:text-2xl font-bold text-brandNavy"
+            >
+              <AlertTriangle className="h-5 w-5 text-red-600" aria-hidden="true" />
+              Disputes ({disputedAssignments.length})
+            </h2>
+            <span className="text-sm text-textBody">
+              Payment is on hold until BlueVerse support settles {disputedAssignments.length === 1 ? 'it' : 'these'}.
+            </span>
+          </div>
+
+          <ul className="space-y-3">
+            {disputedAssignments.map((assignment) => (
+              <li
+                key={assignment.id}
+                className="rounded-xl border border-brandGrid bg-white p-4 md:p-5"
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <Link
+                    href={`/dashboard/assignments/${assignment.id}`}
+                    className="font-medium text-brandNavy hover:text-brandBlue transition-colors"
+                  >
+                    {assignment.title}
+                  </Link>
+                  <Link
+                    href={`/dashboard/assignments/${assignment.id}`}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-brandBlue hover:text-brandAccent"
+                  >
+                    Open assignment
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                </div>
+                <DisputeNotice assignment={assignment} viewerRole="student" compact />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Stats Grid */}
       <section aria-labelledby="stats-heading">

@@ -6,12 +6,15 @@ import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { ArrowLeft, CheckCircle2, Inbox, MessageSquare, Star, XCircle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle2, Inbox, MessageSquare, Star, XCircle } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import SubmissionReview from '@/components/submissions/SubmissionReview';
 import ReviewCard from '@/components/reviews/ReviewCard';
 import ReviewForm from '@/components/reviews/ReviewForm';
+import DisputeDialog from '@/components/disputes/DisputeDialog';
+import DisputeNotice from '@/components/disputes/DisputeNotice';
 import { statusLabel, statusTone } from '@/lib/status';
+import { canRaiseDispute } from '@/lib/disputes';
 
 export default function AssignmentDetailPage() {
   const { id } = useParams();
@@ -23,6 +26,7 @@ export default function AssignmentDetailPage() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showDisputeDialog, setShowDisputeDialog] = useState(false);
 
   useEffect(() => {
     fetchAssignmentDetails();
@@ -223,6 +227,16 @@ export default function AssignmentDetailPage() {
   const canReview =
     isOwner && assignment.status === 'completed' && Boolean(assignment.assigned_writer_id);
 
+  // Both parties can escalate, but the route decides authoritatively: this only
+  // keeps the button off screen when the status makes a dispute impossible.
+  const viewerRole = isOwner ? 'student' : isAssignedWriter ? 'writer' : null;
+  const disputeGate = canRaiseDispute(assignment, profile?.id);
+
+  const handleDisputeOpened = async () => {
+    setShowDisputeDialog(false);
+    await fetchAssignmentDetails();
+  };
+
   return (
     <DashboardLayout>
       <div className="max-w-6xl">
@@ -257,6 +271,17 @@ export default function AssignmentDetailPage() {
                     <MessageSquare className="h-4 w-4" />
                     Message {isOwner ? 'writer' : 'student'}
                   </Link>
+                )}
+
+                {disputeGate.ok && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDisputeDialog(true)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+                  >
+                    <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                    Open a dispute
+                  </button>
                 )}
               </div>
             </div>
@@ -315,11 +340,21 @@ export default function AssignmentDetailPage() {
           ) : null}
         </div>
 
-        {/* Submission Review (student only) */}
+        {/* Open dispute notice: visible to both parties on every visit */}
+        {assignment.status === 'disputed' && (
+          <div className="mb-6">
+            <DisputeNotice assignment={assignment} viewerRole={viewerRole} />
+          </div>
+        )}
+
+        {/* Submission Review (student only). Reviewing is only possible while
+            the work is under review; a dispute or a completed assignment must
+            not offer buttons the review API will refuse. */}
         {isOwner && latestSubmission && (
           <SubmissionReview
             submission={latestSubmission}
             submissions={submissions}
+            reviewable={assignment.status === 'under_review'}
             onActionComplete={fetchAssignmentDetails}
           />
         )}
@@ -457,6 +492,14 @@ export default function AssignmentDetailPage() {
           )}
         </div>
       </div>
+
+      {showDisputeDialog && (
+        <DisputeDialog
+          assignment={assignment}
+          onCancel={() => setShowDisputeDialog(false)}
+          onOpened={handleDisputeOpened}
+        />
+      )}
     </DashboardLayout>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import StudentDashboard from '@/components/dashboard/StudentDashboard';
 import WriterDashboard from '@/components/dashboard/WriterDashboard';
+import AdminDashboard from '@/components/dashboard/AdminDashboard';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 
 export default function DashboardPage() {
@@ -36,6 +37,7 @@ export default function DashboardPage() {
     <DashboardLayout>
       {profile.user_type === 'student' && <StudentDashboard />}
       {profile.user_type === 'writer' && <WriterDashboard />}
+      {profile.user_type === 'admin' && <AdminDashboard />}
     </DashboardLayout>
   );
 }

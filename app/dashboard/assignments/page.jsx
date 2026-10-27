@@ -107,6 +107,8 @@ export default function AssignmentsPage() {
             { value: 'in_progress', label: 'In Progress' },
             { value: 'under_review', label: 'Under Review' },
             { value: 'completed', label: 'Completed' },
+            { value: 'disputed', label: 'Disputed' },
+            { value: 'cancelled', label: 'Cancelled' },
           ].map((filterOption) => (
             <button
               key={filterOption.value}
@@ -194,6 +196,13 @@ export default function AssignmentsPage() {
                     <p className="font-medium text-textDark">{assignment.bids?.[0]?.count || 0}</p>
                   </div>
                 </div>
+
+                {assignment.status === 'disputed' && (
+                  <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    Payment is on hold while BlueVerse support reviews this dispute. Open the
+                    assignment to see the reason and keep talking in Messages.
+                  </p>
+                )}
               </Link>
             ))}
           </div>

@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { Briefcase, Zap, CheckCircle, DollarSign, Search, TrendingUp, Star, Award, ArrowRight } from 'lucide-react';
+import { Briefcase, Zap, CheckCircle, DollarSign, Search, TrendingUp, Star, Award, ArrowRight, AlertTriangle } from 'lucide-react';
 import { buildEarningsSummary } from '@/lib/payments';
-import { ACTIVE_ASSIGNMENT_STATUSES } from '@/lib/status';
+import { COMPLETED_ASSIGNMENT_STATUSES, OPEN_WORK_STATUSES } from '@/lib/status';
+import DisputeNotice from '@/components/disputes/DisputeNotice';
 
 export default function WriterDashboard() {
   const { profile } = useAuth();
@@ -17,6 +18,7 @@ export default function WriterDashboard() {
     totalEarnings: 0,
   });
   const [recentOpportunities, setRecentOpportunities] = useState([]);
+  const [disputedJobs, setDisputedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -41,12 +43,14 @@ export default function WriterDashboard() {
 
       if (bidsError) throw bidsError;
 
-      // Every job that has been awarded to this writer
+      // Every job that has been awarded to this writer. Disputed jobs are part of
+      // OPEN_WORK_STATUSES: a dispute does not end the writer's involvement, and
+      // omitting the status used to make disputed work vanish from this page.
       const { data: jobs, error: jobsError } = await supabase
         .from('assignments')
         .select('*')
         .eq('assigned_writer_id', userId)
-        .in('status', [...ACTIVE_ASSIGNMENT_STATUSES, 'under_review', 'completed']);
+        .in('status', [...OPEN_WORK_STATUSES, ...COMPLETED_ASSIGNMENT_STATUSES]);
 
       if (jobsError) throw jobsError;
 
@@ -64,8 +68,10 @@ export default function WriterDashboard() {
       setRecentOpportunities(opportunities || []);
 
       const rows = jobs || [];
-      const activeJobs = rows.filter((job) => ACTIVE_ASSIGNMENT_STATUSES.includes(job.status));
+      const activeJobs = rows.filter((job) => OPEN_WORK_STATUSES.includes(job.status));
       const completedJobs = rows.filter((job) => job.status === 'completed');
+
+      setDisputedJobs(rows.filter((job) => job.status === 'disputed'));
 
       setStats({
         activeBids: (bids || []).filter((bid) => bid.status === 'pending').length,
@@ -109,6 +115,56 @@ export default function WriterDashboard() {
             Try again
           </button>
         </div>
+      )}
+
+      {/* Disputed jobs: the money is frozen until support decides */}
+      {disputedJobs.length > 0 && (
+        <section aria-labelledby="disputes-heading" className="mb-10">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <h2
+              id="disputes-heading"
+              className="flex items-center gap-2 text-lg font-semibold text-brandNavy"
+            >
+              <AlertTriangle className="h-5 w-5 text-red-600" aria-hidden="true" />
+              Disputes ({disputedJobs.length})
+            </h2>
+            <span className="text-sm text-textBody">
+              Earnings on {disputedJobs.length === 1 ? 'this job are' : 'these jobs are'} frozen until
+              BlueVerse support settles {disputedJobs.length === 1 ? 'it' : 'them'}.
+            </span>
+          </div>
+
+          <ul className="space-y-3">
+            {disputedJobs.map((job) => (
+              <li key={job.id} className="rounded-xl border border-brandGrid bg-white p-5">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <Link
+                    href={`/dashboard/assignments/${job.id}`}
+                    className="font-medium text-brandNavy hover:text-brandBlue transition-colors"
+                  >
+                    {job.title}
+                  </Link>
+                  <div className="flex items-center gap-4">
+                    <Link
+                      href={`/dashboard/assignments/${job.id}/messages`}
+                      className="text-sm font-medium text-brandBlue hover:text-brandAccent"
+                    >
+                      Messages
+                    </Link>
+                    <Link
+                      href={`/dashboard/assignments/${job.id}`}
+                      className="inline-flex items-center gap-1 text-sm font-medium text-brandBlue hover:text-brandAccent"
+                    >
+                      Open job
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  </div>
+                </div>
+                <DisputeNotice assignment={job} viewerRole="writer" compact />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* Stats Grid */}

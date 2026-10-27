@@ -18,7 +18,12 @@ import {
   DollarSign,
   LogOut,
   User,
-  Settings
+  Settings,
+  Users,
+  ClipboardList,
+  AlertTriangle,
+  ShieldCheck,
+  Wallet
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
@@ -43,7 +48,18 @@ export default function DashboardLayout({ children }) {
     { name: 'Earnings', href: '/dashboard/earnings', icon: DollarSign },
   ];
 
-  const navigation = profile?.user_type === 'student' ? studentNav : writerNav;
+  const adminNav = [
+    { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Users', href: '/dashboard/admin/users', icon: Users },
+    { name: 'Verification', href: '/dashboard/admin/verification', icon: ShieldCheck },
+    { name: 'Assignments', href: '/dashboard/admin/assignments', icon: ClipboardList },
+    { name: 'Disputes', href: '/dashboard/admin/disputes', icon: AlertTriangle },
+    { name: 'Revenue', href: '/dashboard/admin/revenue', icon: Wallet },
+  ];
+
+  let navigation = writerNav;
+  if (profile?.user_type === 'student') navigation = studentNav;
+  else if (profile?.user_type === 'admin') navigation = adminNav;
 
   // Show loading state
   if (loading) {
@@ -131,7 +147,13 @@ export default function DashboardLayout({ children }) {
         <div className="flex-1 overflow-y-auto py-6 px-3">
           <nav className="space-y-1" aria-label="Dashboard navigation">
             {navigation.map((item) => {
-              const isActive = pathname === item.href;
+              // Detail pages live one level below their list, so /dashboard/admin/users/abc
+              // should still light up Users. The overview is an exact match or it
+              // would claim every page.
+              const isActive =
+                item.href === '/dashboard'
+                  ? pathname === '/dashboard'
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
               return (
                 <Link

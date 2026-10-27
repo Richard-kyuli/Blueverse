@@ -26,9 +26,12 @@ import { getFileUrl } from '@/lib/supabaseStorage';
  * @param {Object} props
  * @param {Object} props.submission - The latest submission for the assignment
  * @param {Object[]} props.submissions - All submissions, newest first (for history)
+ * @param {boolean} [props.reviewable=true] - False when the assignment is not
+ *   under review (disputed, completed or not yet submitted), so the approve and
+ *   revision buttons are not offered for actions the API would refuse
  * @param {Function} props.onActionComplete - Called after a successful review
  */
-export default function SubmissionReview({ submission, submissions = [], onActionComplete }) {
+export default function SubmissionReview({ submission, submissions = [], reviewable = true, onActionComplete }) {
   const [feedback, setFeedback] = useState('');
   const [showRevisionForm, setShowRevisionForm] = useState(false);
   const [processing, setProcessing] = useState(null); // 'approve' | 'revision'
@@ -37,6 +40,7 @@ export default function SubmissionReview({ submission, submissions = [], onActio
   if (!submission) return null;
 
   const isPending = submission.status === 'submitted';
+  const canAct = isPending && reviewable;
   const files = submission.file_urls || [];
 
   const getStatusBadge = (status) => {
@@ -189,7 +193,17 @@ export default function SubmissionReview({ submission, submissions = [], onActio
         )}
       </div>
 
-      {isPending && (
+      {isPending && !reviewable && (
+        <div className="border-t border-brandGrid pt-6">
+          <p className="text-sm text-textBody">
+            This submission cannot be approved right now. Reviewing is only possible while
+            the assignment is under review — if a dispute is open, BlueVerse support settles
+            that first and the work is reviewed afterwards.
+          </p>
+        </div>
+      )}
+
+      {canAct && (
         <div className="border-t border-brandGrid pt-6">
           <label htmlFor="review-feedback" className="block text-sm font-semibold text-brandNavy mb-2">
             {showRevisionForm ? 'What needs to change?' : 'Feedback for the writer (optional)'}

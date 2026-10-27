@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { ADMIN_SIGNIN_PATH } from '@/lib/adminProvisioning';
 
 export default function SignInPage() {
   const [formData, setFormData] = useState({
@@ -117,6 +118,14 @@ export default function SignInPage() {
           Don't have an account?{' '}
           <Link href="/auth/signup" className="text-brandBlue font-medium hover:text-brandAccent">
             Create Account
+          </Link>
+        </p>
+
+        {/* Administrator entry point. Kept visually quiet: the console door is
+            not something to advertise to every visitor. */}
+        <p className="mt-3 text-center text-xs text-textMuted">
+          <Link href={ADMIN_SIGNIN_PATH} className="hover:text-brandBlue">
+            Administrator sign in
           </Link>
         </p>
       </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  AlertTriangle,
   Award,
   Bell,
   CheckCheck,
@@ -12,6 +13,8 @@ import {
   CreditCard,
   Loader2,
   MessageSquare,
+  Scale,
+  ShieldAlert,
   Star,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -34,6 +37,9 @@ const TYPE_ICONS = {
   message_received: MessageSquare,
   review_received: Star,
   bid_accepted: Award,
+  account_updated: ShieldAlert,
+  dispute_raised: AlertTriangle,
+  dispute_resolved: Scale,
 };
 
 /**
