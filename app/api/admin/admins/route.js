@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
  * PATCH /api/admin/admins
  *
  * An existing administrator promotes an account that already exists.
- * Body: { userId } or { email } — an id is exact, an email is what the person
+ * Body: { userId } or { email }. An id is exact, an email is what the person
  * adding them usually has to hand.
  *
  * Why this is not part of PATCH /api/admin/users: that endpoint is moderation
@@ -31,7 +31,7 @@ export const dynamic = 'force-dynamic';
  * own audit surface and its own guard (canPromoteToAdmin).
  *
  * Both handlers require authenticateAdmin: the caller must already be an active
- * administrator. There is no bootstrap code here — that belongs to
+ * administrator. There is no bootstrap code here; that belongs to
  * /api/admin/signup, which exists for the first account only.
  */
 

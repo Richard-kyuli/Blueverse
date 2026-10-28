@@ -36,9 +36,9 @@ const STATUS_OPTIONS = [
 ];
 
 function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return 'n/a';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? 'n/a' : date.toLocaleDateString();
 }
 
 function StatusPills({ user }) {
@@ -361,7 +361,7 @@ function UsersConsole() {
                         <StatusPills user={user} />
                       </td>
                       <td className="px-4 md:px-6 py-4 text-right text-sm text-textBody hidden md:table-cell">
-                        {user.rating ? Number(user.rating).toFixed(1) : '—'}
+                        {user.rating ? Number(user.rating).toFixed(1) : 'n/a'}
                       </td>
                       <td className="px-4 md:px-6 py-4 text-right text-sm text-textBody hidden lg:table-cell">
                         {user.completed_assignments ?? 0}

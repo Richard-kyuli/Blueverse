@@ -54,7 +54,7 @@ export default function SubmissionReview({ submission, submissions = [], reviewa
   };
 
   const formatDate = (value) =>
-    value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'n/a';
 
   // Stored paths look like "{assignmentId}/{submissionId}/{timestamp}-essay.pdf"
   const getDisplayName = (path) => path.split('/').pop().replace(/^\d+-/, '');
@@ -115,8 +115,8 @@ export default function SubmissionReview({ submission, submissions = [], reviewa
 
       toast.success(
         action === 'approve'
-          ? 'Work approved — the assignment is complete'
-          : 'Revision requested — the writer can resubmit'
+          ? 'Work approved. The assignment is complete'
+          : 'Revision requested. The writer can resubmit'
       );
 
       setFeedback('');
@@ -197,7 +197,7 @@ export default function SubmissionReview({ submission, submissions = [], reviewa
         <div className="border-t border-brandGrid pt-6">
           <p className="text-sm text-textBody">
             This submission cannot be approved right now. Reviewing is only possible while
-            the assignment is under review — if a dispute is open, BlueVerse support settles
+            the assignment is under review. If a dispute is open, BlueVerse support settles
             that first and the work is reviewed afterwards.
           </p>
         </div>
@@ -278,7 +278,7 @@ export default function SubmissionReview({ submission, submissions = [], reviewa
 
       {submission.status === 'approved' && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <p className="text-green-800 font-medium">Work approved — assignment completed</p>
+          <p className="text-green-800 font-medium">Work approved. Assignment completed</p>
           {submission.student_feedback && (
             <p className="text-sm text-green-700 mt-1">{submission.student_feedback}</p>
           )}

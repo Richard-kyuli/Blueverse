@@ -63,7 +63,7 @@ export default function DisputeNotice({ assignment, viewerRole = null, action = 
 
           <p className={`mt-2 text-red-800/80 ${compact ? 'text-xs' : 'text-sm'}`}>
             Payment stays on hold until BlueVerse support settles it. Keep talking in
-            Messages — those messages are part of the evidence.
+            Messages, because those messages are part of the evidence.
           </p>
 
           {action && <div className="mt-3">{action}</div>}

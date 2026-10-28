@@ -26,9 +26,9 @@ const ASSIGNMENT_SELECT = `
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
 function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return 'n/a';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? 'n/a' : date.toLocaleDateString();
 }
 
 export default function EarningsPage() {

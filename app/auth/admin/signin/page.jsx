@@ -22,7 +22,7 @@ import {
  * who lands here is signed out again rather than dropped into a console their
  * API calls would reject anyway.
  *
- * The real authorisation is server-side — /api/admin/* re-checks the role with
+ * The real authorisation is server-side: /api/admin/* re-checks the role with
  * the service role on every request. This page is the door, not the lock.
  */
 export default function AdminSignInPage() {

@@ -28,9 +28,9 @@ const ASSIGNMENT_SELECT = `
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
 function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return 'n/a';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? 'n/a' : date.toLocaleDateString();
 }
 
 export default function PaymentsPage() {
@@ -275,7 +275,7 @@ export default function PaymentsPage() {
                         <p className="text-sm text-textBody">
                           {row.subject}
                           {row.budget_min && row.budget_max
-                            ? ` • budget ${money(row.budget_min)} – ${money(row.budget_max)}`
+                            ? ` • budget ${money(row.budget_min)} to ${money(row.budget_max)}`
                             : ''}
                         </p>
                       </div>

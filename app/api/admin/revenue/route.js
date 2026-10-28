@@ -9,7 +9,7 @@ import { buildRevenueReport } from '@/lib/admin';
  * value, the platform/writer split, the last six months of completions and the
  * best-earning writers.
  *
- * This is a derivation over `assignments`, not a ledger — `transactions` exists
+ * This is a derivation over `assignments`, not a ledger. `transactions` exists
  * in the schema but no code writes to it yet, so there is nothing settled to
  * reconcile against.
  *

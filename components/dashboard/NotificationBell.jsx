@@ -71,8 +71,8 @@ function formatRelativeTime(value) {
  * NotificationBell Component
  *
  * Unread indicator plus a quick-view dropdown, rendered in the dashboard header so
- * users (students and writers) see workflow events — new submissions, revision
- * requests, approvals — without leaving the page they are on.
+ * users (students and writers) see workflow events such as new submissions,
+ * revision requests and approvals, without leaving the page they are on.
  *
  * Notifications are written server-side by /api/submissions/submit,
  * /api/submissions/review, /api/messages/send and /api/reviews (see

@@ -82,7 +82,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe('POST /api/admin/signup — gate', () => {
+describe('POST /api/admin/signup: gate', () => {
   it('rejects a body that is not JSON', async () => {
     const { status, body } = await respond(await POST(brokenRequest()));
     expect(status).toBe(400);
@@ -129,7 +129,7 @@ describe('POST /api/admin/signup — gate', () => {
   });
 });
 
-describe('POST /api/admin/signup — provisioning', () => {
+describe('POST /api/admin/signup: provisioning', () => {
   it('creates a confirmed auth user and an admin profile', async () => {
     const { status, body } = await respond(await POST(buildRequest(VALID_BODY)));
 

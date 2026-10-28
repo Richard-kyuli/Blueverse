@@ -36,9 +36,9 @@ const ROLE_OPTIONS = [
 ];
 
 function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return 'n/a';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? 'n/a' : date.toLocaleDateString();
 }
 
 function initials(profile) {

@@ -232,7 +232,7 @@ export default function MessagesInboxPage() {
                             ? `${
                                 conversation.lastMessage.sender_id === userId ? 'You: ' : ''
                               }${conversation.lastMessage.message}`
-                            : 'No messages yet — start the conversation'}
+                            : 'No messages yet. Start the conversation'}
                         </p>
                         {conversation.unreadCount > 0 && (
                           <span

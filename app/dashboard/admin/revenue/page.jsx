@@ -123,7 +123,7 @@ function RevenueReport() {
 
       <p className="rounded-lg border border-brandGrid bg-brandIce/60 p-4 text-sm text-textBody">
         These figures are derived from assignment prices and statuses. Card capture is not
-        reconciled here yet — the <code className="text-xs">transactions</code> table exists but no
+        reconciled here yet. The <code className="text-xs">transactions</code> table exists but no
         code writes to it, so treat this as a pipeline report rather than a bank statement.
       </p>
 

@@ -205,7 +205,7 @@ export default function AddAdminDialog({ onClose, onAdded }) {
 
               <p className="mt-2 text-xs text-textMuted">
                 At least {MIN_ADMIN_PASSWORD_LENGTH} characters. Share the password with them
-                yourself — it is not emailed, and the account is created already confirmed.
+                yourself. It is not emailed, and the account is created already confirmed.
               </p>
             </>
           ) : (

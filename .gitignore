@@ -34,3 +34,6 @@ next-env.d.ts
 # agent-generated repo wiki
 /.qoder/
 
+# local verification screenshots
+/screenshot-*.png
+
